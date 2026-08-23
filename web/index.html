@@ -606,9 +606,16 @@ table.lb td.pos{font:500 12px/1 var(--mono);color:var(--ink-3);width:58px;
 table.lb tr.pr:nth-child(-n+6) td.pos{color:var(--ink-2)}
 
 .cs{display:flex;align-items:center;gap:9px;min-width:0}
-.cs .pav{width:24px;height:24px;border-radius:3px;flex:none;display:grid;
+.cs .pav{width:30px;height:30px;border-radius:3px;flex:none;display:grid;
   place-items:center;font:600 10px/1 var(--mono);
   background:var(--raised);color:var(--ink-2);border:1px solid var(--rule-2)}
+/* Rank braid. One rule for all three chip sizes -- the SVG scales itself, so
+   a Group Captain's four bars stay four bars at 24px and at 52px. */
+.pav svg,.dw-id .av svg{display:block;width:76%;height:76%}
+table.lb td.rk{font:500 10.5px/1 var(--mono);letter-spacing:.08em;
+  color:var(--ink-2);white-space:nowrap}
+.dw-id .rk{font:500 10px/1 var(--mono);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--amber);margin-top:6px}
 .cs .nmw{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   font:500 13px/1.3 var(--ui);color:var(--ink)}
 .caret{display:inline-block;width:8px;color:var(--ink-3);font-size:8px;
@@ -1012,18 +1019,60 @@ const ROLES = {
 };
 const roleOf = n => ROLES[String(n||'').trim().toLowerCase()] || null;
 
-// Initials for a pilot chip. No colour: the chip is monochrome and the status
-// ring carries the only meaning, so a per-name hue would just be decoration
-// competing with a palette where green already means airborne.
-function avatar(name){
-  const t=String(name||'?');
-  // The word-initials approach only understands Latin; a Cyrillic name like
-  // Терминатор stripped to nothing and rendered as '?'. Fall back to the first
-  // two characters of the raw name before giving up.
-  const initials=t.replace(/[^A-Za-z0-9]+/g,' ').trim().split(/\s+/)
-    .slice(0,2).map(w=>w[0]).join('').toUpperCase()
-    || t.trim().slice(0,2).toUpperCase() || '?';
-  return {initials};
+// Indian Air Force commissioned ranks, lowest first. Rank is derived from the
+// XP Pretense already writes and is never written back, so the mission file
+// and the server are untouched.
+//
+// Thresholds are fitted to this squadron's real spread, not picked round. At
+// the time of writing the roster runs from 0 to 23,425 with a median of 613,
+// so the early steps are close together -- a new pilot should move twice in
+// their first few nights -- and each step is then roughly 2.5x the last,
+// tapering to under 2x at the top. That puts the current leader at Air
+// Commodore with two ranks still to earn, and leaves the three air officer
+// ranks above genuinely rare rather than decorative.
+//
+// Marshal of the Indian Air Force is deliberately absent. It is a five-star
+// honour held once in the service's history, by Arjan Singh, and is not a
+// thing to hand out for flight hours.
+//
+// braid follows the RAF pattern the IAF inherited: 2 = broad, 1 = medium,
+// 0.5 = the thin bar that sits between a Squadron Leader's two mediums.
+const RANKS=[
+  {xp:      0, ab:'Fg Offr',  name:'Flying Officer',     braid:[1]},
+  {xp:    250, ab:'Flt Lt',   name:'Flight Lieutenant',  braid:[1,1]},
+  {xp:    750, ab:'Sqn Ldr',  name:'Squadron Leader',    braid:[1,0.5,1]},
+  {xp:  2000, ab:'Wg Cdr',   name:'Wing Commander',     braid:[1,1,1]},
+  {xp:  5000, ab:'Gp Capt',  name:'Group Captain',      braid:[1,1,1,1]},
+  {xp: 12000, ab:'Air Cmde', name:'Air Commodore',      braid:[2]},
+  {xp: 30000, ab:'AVM',      name:'Air Vice Marshal',   braid:[2,1]},
+  {xp: 60000, ab:'Air Mshl', name:'Air Marshal',        braid:[2,1,1]},
+  {xp:100000, ab:'ACM',      name:'Air Chief Marshal',  braid:[2,1,1,1]},
+];
+
+// Highest rank the pilot has reached, plus the next one up when there is one.
+function rankOf(xp){
+  const v=Math.max(0,+xp||0);
+  let i=0;
+  for(let k=0;k<RANKS.length;k++) if(v>=RANKS[k].xp) i=k;
+  return {...RANKS[i], idx:i, next:RANKS[i+1]||null, toNext:RANKS[i+1]?RANKS[i+1].xp-v:0};
+}
+
+// The braid itself. Bars stack bottom-heavy and centre in a fixed box so
+// every rank sits on the same optical baseline in a roster column.
+function braidSvg(braid){
+  const MED=2.4, BROAD=5.0, THIN=1.4, GAP=2.0, W=16, X=4, NARROW=8;
+  const hs=braid.map(w=>w===2?BROAD:w===1?MED:THIN);
+  const tot=hs.reduce((a,b)=>a+b,0)+GAP*(hs.length-1);
+  let y=(20-tot)/2;
+  const bars=hs.map((h,k)=>{
+    // Air officers wear the broad bar; giving it the one warm colour on the
+    // chip marks that boundary instead of tinting rank for its own sake.
+    const c=braid[k]===2?'var(--amber)':'var(--ink-2)';
+    const w=braid[k]===0.5?NARROW:W, x=X+(W-w)/2;
+    const r=`<rect x="${x}" y="${y.toFixed(2)}" width="${w}" height="${h}" rx=".5" fill="${c}"/>`;
+    y+=h+GAP; return r;
+  }).join('');
+  return `<svg viewBox="0 0 24 20" aria-hidden="true">${bars}</svg>`;
 }
 let view = 'list', active = new Set(CATS);
 
@@ -1731,10 +1780,10 @@ function stPip(r){
 }
 
 function pAvatar(r,cls){
-  const av=avatar(r.name);
+  const rk=rankOf(r.xp);
   const ring={airborne:'var(--jade)',cockpit:'var(--blue)',online:'var(--blue-dim)'}[r.status];
-  return `<span class="pav ${cls||''} ${ring?'ring':''}"
-    ${ring?`style="--ringc:${ring}"`:''}>${esc(av.initials)}</span>`;
+  return `<span class="pav ${cls||''} ${ring?'ring':''}" title="${esc(rk.name)}"
+    ${ring?`style="--ringc:${ring}"`:''}>${braidSvg(rk.braid)}</span>`;
 }
 
 function renderPilotsKpi(recs,c){
@@ -1823,6 +1872,7 @@ function renderPilotRoster(recs){
       <th style="width:46px"></th>
       ${th('name','Pilot')}
       ${th('status','Status','hide-s')}
+      <th class="hide-s">Rank</th>
       <th class="hide-s">Aircraft</th>
       ${th('sorties','Sorties','r n hide-s')}
       ${th('kills','Kills','r n')}
@@ -1840,6 +1890,7 @@ function renderPilotRoster(recs){
           ${!r.role&&r.cmd?`<span class="badge cmd">CMD</span>`:''}
         </div></td>
         <td class="hide-s">${stPip(r)}</td>
+        <td class="rk hide-s">${esc(rankOf(r.xp).ab)}</td>
         <td class="hide-s">${r.unit?`<span class="pill2">${esc(r.unit)}</span>`
           :'<span style="color:var(--ink-3)">&mdash;</span>'}</td>
         <td class="r n hide-s">${r.cb?(r.cb.sorties||0):'&mdash;'}</td>
@@ -1881,15 +1932,14 @@ function renderPilotDetail(name){
   const dw=$('#pdrawer');
   if(!r){ dw.innerHTML=''; return; }
 
-  const av=avatar(r.name);
-  const rank=recs.slice().sort((a,b)=>b.xp-a.xp).findIndex(x=>x.name===name)+1;
+  const rk=rankOf(r.xp);
   const cb=r.cb, kd=r.kd;
 
   const tile=(v,l)=>`<div><b>${v}</b><span>${l}</span></div>`;
   const kv=(k,v)=>`<div class="dw-kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
 
   // Only tiles with a real number behind them.
-  const tiles=[tile(r.xp.toLocaleString(),'XP'), tile('#'+rank,'Standing')];
+  const tiles=[tile(r.xp.toLocaleString(),'XP')];
   if(cb) tiles.push(tile(cb.sorties||0,'Sorties'), tile(cb.deaths||0,'Losses'));
   if(kd&&kd.kills) tiles.push(tile(kd.kills,'Kills'));
   if(kd&&kd.traps) tiles.push(tile(kd.traps,'Traps'));
@@ -1904,6 +1954,8 @@ function renderPilotDetail(name){
   if(cb&&(cb.shots||cb.hits)) facts.push(kv('Weapons',
     `${(cb.shots||0).toLocaleString()} released \u00b7 ${(cb.hits||0).toLocaleString()} impacts`));
   if(cb&&cb.ejects) facts.push(kv('Ejections',cb.ejects));
+  if(rk.next) facts.push(kv('Next rank',
+    `${rk.next.name} at ${rk.next.xp.toLocaleString()} XP \u00b7 ${rk.toNext.toLocaleString()} to go`));
   if(r.sb) facts.push(kv('Survival bonus',r.sb));
   if(r.cmd) facts.push(kv('Command actions',r.cmd));
   if(r.first) facts.push(kv('First seen',new Date(r.first*1000).toLocaleDateString()));
@@ -1920,9 +1972,10 @@ function renderPilotDetail(name){
     </div>
 
     <div class="dw-id">
-      <span class="av">${esc(av.initials)}</span>
+      <span class="av" title="${esc(rk.name)}">${braidSvg(rk.braid)}</span>
       <div style="min-width:0">
         <div class="nm">${esc(r.name)}</div>
+        <div class="rk">${esc(rk.name)}</div>
         ${r.role?`<div class="rl"><span class="badge role">${esc(r.role.tag)}</span></div>
                   <div class="pnote" style="margin-top:7px">${esc(r.role.title)}</div>`:''}
         <div class="stline">${stPip(r)}</div>
