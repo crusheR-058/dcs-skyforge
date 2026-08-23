@@ -1,0 +1,1150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyForge Mission Board</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+:root{
+  --bg:#0a0d12; --panel:#12161d; --panel2:#171c25; --line:#242b36;
+  --fg:#e7edf5; --dim:#8b96a8; --dimmer:#5c6675;
+  --blue:#4a9eff; --red:#ff4d4d; --green:#3fd07a; --amber:#ffb020;
+  --violet:#a970ff; --cyan:#3fd8d8; --pink:#ff6ba8;
+  --r:10px;
+  /* Header height. Seeded with the historical constant so the first paint is
+     right, then measured for real by syncHeaderHeight(). */
+  --hdrh:196px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+  font:13px/1.45 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+
+/* ---------- floating header ---------- */
+#hdr{position:fixed;top:12px;left:12px;right:12px;z-index:1000;
+  background:rgba(18,22,29,.94);backdrop-filter:blur(10px);
+  border:1px solid var(--line);border-radius:14px;padding:12px 16px}
+.hrow{display:flex;align-items:center;gap:14px}
+.brand{display:flex;align-items:center;gap:11px;flex:none}
+.mark{width:34px;height:34px;border-radius:50%;border:2px solid var(--amber);
+  display:grid;place-items:center;font-size:13px;font-weight:800;color:var(--amber);
+  letter-spacing:-.5px}
+.brand h1{font-size:19px;margin:0;letter-spacing:.12em;font-weight:800}
+.ver{font-size:10px;color:var(--dim);border:1px solid var(--line);
+  border-radius:20px;padding:2px 8px}
+.spacer{flex:1}
+.hstat{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:12px}
+.hstat b{color:var(--fg)}
+
+/* ---------- server tabs ---------- */
+#tabs{display:flex;gap:8px;margin-top:11px;overflow-x:auto;padding-bottom:2px}
+.tab{display:flex;align-items:center;gap:9px;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;white-space:nowrap}
+.tab.on{border-color:var(--green);box-shadow:0 0 0 1px rgba(63,208,122,.25)}
+.tab .nm{font-weight:700;font-size:13px}
+.tab .era{font-size:9px;color:var(--dim);letter-spacing:.1em}
+.pill{font-size:11px;font-weight:700;border-radius:5px;padding:1px 7px;
+  background:#1e2530;color:var(--dim)}
+.pill.av{color:var(--green)} .pill.ac{color:var(--amber)}
+
+/* ---------- status strip ---------- */
+#strip{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:7px;background:var(--panel2);
+  border:1px solid var(--line);border-radius:8px;padding:7px 13px;
+  color:var(--dim);font-size:12px;flex:1;justify-content:center;min-width:120px}
+.chip b{color:var(--fg)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.dot.off{background:#5c6675}
+
+/* ---------- controls ---------- */
+#ctl{display:flex;align-items:center;gap:10px;margin-top:10px;
+  padding-top:10px;border-top:1px solid var(--line);flex-wrap:wrap}
+.lbl{font-size:10px;color:var(--dimmer);letter-spacing:.13em}
+.seg{display:flex;gap:5px}
+.sb{background:var(--panel2);border:1px solid var(--line);border-radius:7px;
+  padding:5px 13px;font-size:12px;color:var(--dim)}
+.sb.on{background:rgba(74,158,255,.16);border-color:var(--blue);color:var(--blue)}
+.fb{background:transparent;border:1px solid var(--line);border-radius:16px;
+  padding:3px 11px;font-size:11px;color:var(--dim)}
+.fb.on{border-color:currentColor}
+.fb[data-c=cas]{color:var(--amber)} .fb[data-c=sead]{color:var(--violet)}
+.fb[data-c=supply]{color:var(--cyan)} .fb[data-c=patrol]{color:var(--blue)}
+.fb[data-c=strike]{color:var(--red)} .fb[data-c=assault]{color:var(--pink)}
+.fb[data-c=csar]{color:var(--green)}
+
+/* ---------- body ---------- */
+#main{position:absolute;inset:0;padding-top:var(--hdrh)}
+#map{height:100%;background:#070a0e}
+#list{height:100%;overflow-y:auto;padding:8px 12px 24px;
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+@media(max-width:900px){#list{grid-template-columns:1fr}}
+.col h3{font-size:11px;letter-spacing:.14em;color:var(--dim);margin:0 0 9px;
+  position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:2}
+.col h3 span{color:var(--fg)}
+
+/* ---------- mission cards ---------- */
+.mc{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--dim);
+  border-radius:8px;padding:9px 12px;margin-bottom:8px}
+.mc.cas{border-left-color:var(--amber)} .mc.sead{border-left-color:var(--violet)}
+.mc.supply{border-left-color:var(--cyan)} .mc.patrol{border-left-color:var(--blue)}
+.mc.strike{border-left-color:var(--red)} .mc.assault{border-left-color:var(--pink)}
+.mc.csar{border-left-color:var(--green)}
+.mc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mid{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--dimmer)}
+.cat{font-size:9px;font-weight:800;letter-spacing:.1em;border-radius:4px;
+  padding:2px 7px;background:#1e2530}
+.cat.cas{color:var(--amber)} .cat.sead{color:var(--violet)}
+.cat.supply{color:var(--cyan)} .cat.patrol{color:var(--blue)}
+.cat.strike{color:var(--red)} .cat.assault{color:var(--pink)}
+.cat.csar{color:var(--green)}
+.stars{color:var(--amber);font-size:10px;letter-spacing:1px}
+.mc .zone{margin-top:5px;font-weight:700;font-size:13px;display:flex;
+  align-items:center;gap:7px}
+.mc .desc{color:var(--dim);font-size:12px;margin-top:2px}
+.mc-foot{display:flex;justify-content:space-between;align-items:center;margin-top:7px}
+.xp{font-size:11px;font-weight:700;color:var(--green)}
+.meta{font-size:11px;color:var(--dimmer);font-family:ui-monospace,Consolas,monospace}
+.prog{height:5px;background:#1e2530;border-radius:3px;margin-top:7px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--green)}
+.empty{color:var(--dimmer);font-style:italic;padding:14px;text-align:center;
+  border:1px dashed var(--line);border-radius:8px}
+
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);
+  color:var(--fg);border:1px solid var(--line)}
+.leaflet-container{background:#070a0e;font:inherit}
+.trk{font-family:ui-monospace,Consolas,monospace;font-size:10px;line-height:1.15;
+  white-space:nowrap;text-shadow:0 0 4px #000,0 0 4px #000}
+#offline{position:absolute;inset:var(--hdrh) 0 0;display:grid;place-items:center;
+  background:rgba(10,13,18,.72);z-index:500;text-align:center}
+
+/* --- panel views (pilots / history / files) ----------------------------- */
+#panel{height:100%;overflow-y:auto;padding:20px 26px 46px}
+#mapnote{position:absolute;left:0;right:0;bottom:0;z-index:600;pointer-events:none;
+  text-align:center;padding:7px 12px;font-size:11.5px;color:var(--dim);
+  background:linear-gradient(transparent,rgba(10,13,18,.9) 45%)}
+.pnl{max-width:1040px;margin:0 auto}
+.pnl.wide{max-width:none}
+.pnl h2{font:600 13px/1 ui-sans-serif,system-ui;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dim);margin:0 0 14px}
+.pnl .sub{font-size:12px;color:var(--dim);margin:-8px 0 18px;line-height:1.6}
+.pos{color:var(--dim);width:34px;font-variant-numeric:tabular-nums}
+.pos.top{color:#ffc848;font-weight:700}
+.xp{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;width:90px}
+.badge{display:inline-block;font:700 9px/1 ui-sans-serif,system-ui;letter-spacing:.08em;
+  padding:3px 6px;border-radius:4px;margin-left:6px;vertical-align:1px}
+.badge.cmd{background:rgba(255,200,72,.16);color:#ffc848}
+.badge.sb{background:rgba(74,158,255,.16);color:var(--blue)}
+.badge.on{background:rgba(74,222,128,.16);color:#4ade80}
+.badge.role{background:rgba(169,112,255,.18);color:var(--violet);
+  border:1px solid rgba(169,112,255,.35)}
+.pnl .roles{font-size:12px;color:var(--dim);margin:-6px 0 16px;line-height:1.7}
+.pnl .roles b{color:var(--violet);font-weight:600}
+.dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.dlc{border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+  background:rgba(255,255,255,.02)}
+.dlc .n{font-weight:600;font-size:14px;margin-bottom:2px}
+.dlc .v{font:600 11px/1 ui-monospace,monospace;color:var(--blue);margin-bottom:8px}
+.dlc .d{font-size:12px;color:var(--dim);line-height:1.55}
+.dlc a{color:var(--blue);text-decoration:none;font-size:12px;font-weight:600}
+.dlc a:hover{text-decoration:underline}
+.dlc .ask{font-size:12px;color:#ffc848}
+.req{margin:0 0 18px;padding:12px 14px;border-radius:10px;font-size:12.5px;
+  line-height:1.6;background:rgba(255,200,72,.07);border:1px solid rgba(255,200,72,.22)}
+.tlwrap{border:1px solid var(--line);border-radius:10px;padding:16px;
+  background:rgba(255,255,255,.02)}
+.tlwrap svg{width:100%;height:220px;display:block}
+.tlx{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);
+  margin-top:6px;font-variant-numeric:tabular-nums}
+.tlk{display:flex;gap:16px;font-size:11.5px;color:var(--dim);margin-bottom:12px}
+.tlk i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.empty{color:var(--dim);font-size:13px;padding:26px 0;text-align:center}
+
+/* --- GCI controller panel ----------------------------------------------- */
+/* top must clear the fixed header: an absolutely-positioned child is laid
+   out against #main's PADDING box, so padding-top does not move it. */
+#gci{position:absolute;top:var(--hdrh);right:0;bottom:0;width:310px;z-index:620;
+  overflow-y:auto;padding:14px 14px 40px;background:rgba(12,16,22,.93);
+  backdrop-filter:blur(8px);border-left:1px solid var(--line);font-size:12px}
+@media(max-width:820px){#gci{display:none!important}}
+#gci h3{font:600 9.5px/1 ui-sans-serif,system-ui;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--dimmer);margin:16px 0 7px}
+#gci h3:first-child{margin-top:0}
+#gci .row{display:flex;justify-content:space-between;gap:8px;padding:4px 0;
+  border-bottom:1px solid rgba(255,255,255,.045);line-height:1.35}
+#gci .row:last-child{border-bottom:0}
+#gci .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#gci .rt{color:var(--dim);font-variant-numeric:tabular-nums;flex:none}
+#gci .warn{color:#ffc848}
+#gci .none{color:var(--dimmer);font-style:italic;padding:3px 0}
+#gci .tot{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+#gci .kv{background:rgba(255,255,255,.05);border-radius:5px;padding:3px 7px;
+  font-size:10.5px;color:var(--dim)}
+
+/* --- intel toggle -------------------------------------------------------- */
+#intel{position:absolute;top:calc(var(--hdrh) + 10px);right:12px;z-index:640;
+  background:var(--panel2);border:1px solid var(--line);border-radius:7px;
+  padding:6px 12px;font:600 11px/1 ui-sans-serif,system-ui;letter-spacing:.08em;
+  color:var(--dim);cursor:pointer}
+#intel.on{background:rgba(74,158,255,.16);border-color:var(--blue);color:var(--blue);
+  right:322px}
+@media(max-width:820px){#intel.on{right:12px}}
+
+/* --- pilot detail card --------------------------------------------------- */
+.pgrid{display:grid;gap:16px;grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:1400px){.pgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1000px){.pgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.pgrid{grid-template-columns:1fr}}
+
+/* A standalone tile now, rather than something glued under a table row. */
+.pgrid .pcard{position:relative;overflow:hidden;
+  border:1px solid var(--line);border-radius:10px;
+  background:var(--panel);display:flex;flex-direction:column}
+.pgrid .pcard:hover{border-color:rgba(74,158,255,.35)}
+
+/* Ordering is the one thing lost by dropping the numbered table, so make the
+   podium readable at a glance instead. */
+.pgrid .pcard.p1{border-color:rgba(255,200,72,.45)}
+.pgrid .pcard.p2{border-color:rgba(190,200,215,.32)}
+.pgrid .pcard.p3{border-color:rgba(205,127,50,.38)}
+.prank{position:absolute;top:12px;right:14px;font:600 11px/1 ui-sans-serif,system-ui;
+  color:var(--dimmer);letter-spacing:.06em}
+.pcard.p1 .prank{color:#ffc848} .pcard.p2 .prank{color:#bec8d7}
+.pcard.p3 .prank{color:#cd7f32}
+.pgrid .pnote{flex:1}
+/* Bottom-align the stat strip so a row of cards with different note lengths
+   still lines its numbers up. */
+.pgrid .pstats{margin-top:auto}
+.pgrid .pname{padding-right:34px}
+
+.pcard{border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;
+  padding:18px 20px 0;margin:0 0 12px}
+.phead{display:flex;gap:14px;align-items:flex-start}
+.pav{width:56px;height:56px;border-radius:12px;flex:none;display:grid;
+  place-items:center;font:700 19px/1 ui-sans-serif,system-ui;letter-spacing:.02em;
+  background:var(--avb);color:var(--avf);border:1px solid var(--avf)}
+.pname{font:600 17px/1.2 ui-sans-serif,system-ui;color:#ffc848;margin-bottom:7px}
+.ppills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.pill2{background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+  padding:3px 9px;font-size:11px;color:var(--dim)}
+.pill2.b{border-color:rgba(74,158,255,.4);color:var(--blue)}
+.pill2.r{border-color:rgba(255,77,77,.4);color:var(--red)}
+.pnote{font-size:12.5px;color:var(--dim);line-height:1.75}
+.pstats{display:flex;gap:0;margin:16px -20px 0;border-top:1px solid var(--line)}
+.pstats>div{flex:1;min-width:0;padding:12px 8px;text-align:center;
+  border-right:1px solid rgba(255,255,255,.05)}
+.pstats>div:last-child{border-right:0}
+.pstats b{display:block;font:600 17px/1.2 ui-sans-serif,system-ui;color:var(--fg);
+  overflow:hidden;text-overflow:ellipsis;
+  font-variant-numeric:tabular-nums}
+.pstats span{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  color:var(--dimmer);margin-top:3px}
+
+/* --- activity feed ------------------------------------------------------- */
+.feed{margin-top:4px}
+.fe{display:flex;gap:8px;align-items:baseline;padding:4px 0;
+  border-bottom:1px solid rgba(255,255,255,.045);line-height:1.35}
+.fe:last-child{border-bottom:0}
+.fe .ft{flex:none;font-size:10px;color:var(--dimmer);font-variant-numeric:tabular-nums}
+.fe .fk{flex:none;font-size:9px;letter-spacing:.1em;padding:1px 5px;border-radius:4px;
+  background:rgba(255,255,255,.06);color:var(--dim)}
+.fe.kill .fk{background:rgba(255,77,77,.18);color:var(--red)}
+.fe.capture .fk{background:rgba(74,158,255,.18);color:var(--blue)}
+.fe.trap .fk{background:rgba(255,200,72,.18);color:#ffc848}
+.fe.join .fk,.fe.leave .fk{background:rgba(74,222,128,.14);color:#4ade80}
+.fe .fx{color:var(--fg)}
+/* --- squadron totals ----------------------------------------------------- */
+.tot2{display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 18px}
+.tot2 div{background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+  padding:8px 13px;min-width:88px}
+.tot2 b{display:block;font:600 17px/1.2 ui-sans-serif,system-ui;
+  font-variant-numeric:tabular-nums}
+.tot2 span{display:block;font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--dimmer);margin-top:3px}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div class="hrow">
+    <div class="brand">
+      <div class="mark">SF</div>
+      <h1>SKYFORGE MISSION BOARD</h1>
+      <span class="ver" id="ver">v1.0</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="hstat">&#128100; <b id="hPlay">0</b> playing</div>
+    <div class="hstat">&#128737; <b id="hZones">0</b> zones held</div>
+  </div>
+
+  <div id="tabs"></div>
+  <div id="strip"></div>
+
+  <div id="ctl">
+    <span class="lbl">VIEW</span>
+    <div class="seg" id="views">
+      <button class="sb on" data-v="list">List</button>
+      <button class="sb" data-v="map">Map</button>
+      <button class="sb" data-v="pilots">Pilots</button>
+      <button class="sb" data-v="history">History</button>
+      <button class="sb" data-v="files">Files</button>
+    </div>
+    <span class="lbl" style="margin-left:8px">CATEGORY</span>
+    <div class="seg" id="cats"></div>
+    <div class="spacer"></div>
+    <span class="meta" id="upd">—</span>
+  </div>
+</div>
+
+<div id="main">
+  <div id="list"></div>
+  <div id="map" style="display:none"></div>
+  <div id="panel" style="display:none"></div>
+  <button id="intel" style="display:none" title="Contact labels and the controller panel">INTEL</button>
+  <div id="gci" style="display:none"></div>
+  <div id="mapnote"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+// ---------------------------------------------------------------------------
+// SkyForge Mission Board.
+//
+// Static JSON from CloudFront, no API server. The DCS box publishes while it
+// runs; when it sleeps the files stop changing, so every panel is driven from
+// status.json's timestamp rather than assuming data means "live".
+//
+// Mission cards are derived from Pretense's own state: zones building a mission
+// (currentMissionBuild) are ACTIVE, zones that could be pushed are AVAILABLE,
+// and downed pilots in csarTracker become rescue tasks.
+// ---------------------------------------------------------------------------
+const DATA = './data/', POLL = 10000, STALE = 150;
+const SIDE = {0:'#8b96a8', 1:'#ff4d4d', 2:'#4a9eff'};
+const CATS = ['patrol','cas','sead','strike','assault','supply','csar'];
+
+// Squadron appointments. Keyed by the exact DCS player name -- matched
+// case-insensitively, because people re-type their name and capitalisation
+// drifts. Add a line to give someone a title; nothing else needs changing.
+//
+// OVERLORD is the traditional NATO callsign for ground-based intercept
+// control, which is the job rather than a nickname.
+const ROLES = {
+  'r00k': {tag:'OVERLORD', title:'Ground Control Intercept \u00b7 runs the radar picture and vectors the flight'},
+};
+const roleOf = n => ROLES[String(n||'').trim().toLowerCase()] || null;
+
+// Deterministic avatar colour per pilot, so the same person is always the same
+// colour without storing anything.
+function avatar(name){
+  let h=0; const t=String(name||'?');
+  for(let i=0;i<t.length;i++) h=(h*31 + t.charCodeAt(i))|0;
+  const hue=Math.abs(h)%360;
+  // The word-initials approach only understands Latin; a Cyrillic name like
+  // Терминатор stripped to nothing and rendered as '?'. Fall back to the first
+  // two characters of the raw name before giving up.
+  const initials=t.replace(/[^A-Za-z0-9]+/g,' ').trim().split(/\s+/)
+    .slice(0,2).map(w=>w[0]).join('').toUpperCase()
+    || t.trim().slice(0,2).toUpperCase() || '?';
+  return {initials, bg:`hsl(${hue} 45% 16%)`, fg:`hsl(${hue} 70% 62%)`};
+}
+let view = 'list', active = new Set(CATS);
+
+// Controller mode: contact labels + the intel panel. Remembered per browser so
+// whoever runs GCI does not re-enable it every visit. Storage can throw
+// outright in a private window, so never let it stop the page rendering.
+let intel = (() => { try { return localStorage.getItem('sf-intel') === '1'; }
+                     catch(e) { return false; } })();
+let D = {status:null, campaign:null, live:null, pilots:null, history:null, zones:null,
+         seen:null, combat:null, kd:null, feed:null};
+
+const $ = s => document.querySelector(s);
+// Pilot names are attacker-controlled text rendered into innerHTML. Escape.
+const esc = v => String(v==null?'':v).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const el = (t,c,h) => { const e=document.createElement(t); if(c)e.className=c;
+  if(h!==undefined)e.innerHTML=h; return e; };
+
+// --- map -------------------------------------------------------------------
+const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([42.6,42.0],7);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  {attribution:'&copy; OSM &copy; CARTO',subdomains:'abcd',maxZoom:18}).addTo(map);
+const gZones=L.layerGroup().addTo(map), gUnits=L.layerGroup().addTo(map),
+      gTrk=L.layerGroup().addTo(map);
+let mapReady=false;
+
+// Affine transform from DCS metres to lat/lon, solved from the reference points
+// the export hook publishes. Pretense stores raw metres, so without this its
+// zones and downed pilots cannot be placed at all.
+// DCS metres -> lat/lon, exact inverse transverse Mercator.
+//
+// The constants come from the terrain itself (pydcs generates them from DCS)
+// and ride along in zones.json, so this needs no reference points and no live
+// server. Validated against six Caucasus airfields: worst error 0.75 km, best
+// 0.03 km -- and those residuals are zone-centre vs airport reference point,
+// not projection error.
+//
+// DCS axis order is the trap: mission x is NORTHING, z is EASTING. Swapping
+// them mirrors the map into the Black Sea.
+const WGS_A = 6378137.0, WGS_F = 1/298.257223563;
+const WGS_E2 = WGS_F*(2-WGS_F), WGS_EP2 = WGS_E2/(1-WGS_E2);
+
+function dcsLL(x, z){
+  const p = D.zones && D.zones.proj;
+  if(!p || !isFinite(x) || !isFinite(z)) return null;
+
+  const E = z - p.x0, N = x - p.y0, k0 = p.k0;
+  const e1 = (1-Math.sqrt(1-WGS_E2))/(1+Math.sqrt(1-WGS_E2));
+  const mu = (N/k0)/(WGS_A*(1 - WGS_E2/4 - 3*WGS_E2**2/64 - 5*WGS_E2**3/256));
+
+  const phi1 = mu
+    + (3*e1/2 - 27*e1**3/32)*Math.sin(2*mu)
+    + (21*e1**2/16 - 55*e1**4/32)*Math.sin(4*mu)
+    + (151*e1**3/96)*Math.sin(6*mu)
+    + (1097*e1**4/512)*Math.sin(8*mu);
+
+  const sp = Math.sin(phi1), cp = Math.cos(phi1), tp = Math.tan(phi1);
+  const C1 = WGS_EP2*cp*cp, T1 = tp*tp;
+  const N1 = WGS_A/Math.sqrt(1 - WGS_E2*sp*sp);
+  const R1 = WGS_A*(1-WGS_E2)/Math.pow(1 - WGS_E2*sp*sp, 1.5);
+  const d = E/(N1*k0), d2 = d*d, d4 = d2*d2, d6 = d4*d2;
+
+  const lat = phi1 - (N1*tp/R1)*(d2/2
+    - (5 + 3*T1 + 10*C1 - 4*C1*C1 - 9*WGS_EP2)*d4/24
+    + (61 + 90*T1 + 298*C1 + 45*T1*T1 - 252*WGS_EP2 - 3*C1*C1)*d6/720);
+  const lon = p.lon0*Math.PI/180 + (d
+    - (1 + 2*T1 + C1)*d*d2/6
+    + (5 - 2*C1 + 28*T1 - 3*C1*C1 + 8*WGS_EP2 + 24*T1*T1)*d*d4/120)/cp;
+
+  const out = [lat*180/Math.PI, lon*180/Math.PI];
+  return (isFinite(out[0]) && isFinite(out[1])) ? out : null;
+}
+
+// Pretense stores {x, y, z} with y as altitude.
+const toLL = p => !p ? null : dcsLL(p.x, p.z);
+
+// --- helpers ---------------------------------------------------------------
+const ago = s => s<60?`${Math.round(s)}s`:s<3600?`${Math.round(s/60)}m`:
+  s<86400?`${Math.round(s/3600)}h`:`${Math.round(s/86400)}d`;
+const mmss = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+const grab = async n => { try{ const r=await fetch(DATA+n,{cache:'no-store'});
+  return r.ok? await r.json():null; }catch{ return null; } };
+
+function catOf(name){
+  const s=(name||'').toLowerCase();
+  for(const c of ['cas','sead','strike','assault','supply','patrol']) if(s.includes(c)) return c;
+  return 'patrol';
+}
+// Hours read better than minutes once someone has a few sessions in.
+const flown = m => !m ? null : m < 90
+  ? `${Math.round(m)} min` : `${(m/60).toFixed(1)} h`;
+
+const stars = n => '★'.repeat(n)+'<span style="color:#333">'+'★'.repeat(4-n)+'</span>';
+
+// --- derive missions from Pretense state -----------------------------------
+function missions(){
+  const c=D.campaign; if(!c) return {avail:[],act:[]};
+  const avail=[], act=[];
+
+  Object.values(c.zones||{}).forEach(z=>{
+    if(z.currentMissionBuild){
+      const m=z.currentMissionBuild;
+      act.push({id:m.name, cat:catOf(m.name), zone:z.name, side:m.side,
+        desc:`Building ${m.name.replace(/-/g,' ')} at ${z.name}`,
+        prog:Math.min(100,m.progress), diff:2, xp:Math.round(m.progress*8)});
+    }
+    // A contested blue-adjacent zone is something players can actually act on.
+    if(z.distToFront<=2 && z.side!==0){
+      avail.push({id:z.name.toLowerCase(), cat: z.side===1?'strike':'patrol',
+        zone:z.name, side:z.side,
+        desc: z.side===1 ? `Capture ${z.name} — ${z.distToFront} zones from the front`
+                         : `Defend ${z.name} — enemy ${Math.round(z.closestEnemyDist/1000)} km out`,
+        diff: Math.max(1,Math.min(4,5-z.distToFront)),
+        xp: 200+Math.round((z.resource||0)/200), res:z.resource});
+    }
+  });
+
+  Object.values(c.csarTracker||{}).forEach(p=>{
+    avail.push({id:p.name, cat:'csar', zone:'downed pilot', side:2,
+      desc:`Rescue ${p.name} and return them to a friendly zone`,
+      diff:3, xp:500, timer:p.remainingTime, pos:p.pos});
+  });
+
+  // Ground squads waiting for a lift. These only became flyable work when the
+  // Hercules and UH-60 went on the server, and Pretense already tracks them
+  // with a countdown.
+  Object.values(c.squadTracker||{}).forEach(q=>{
+    if(q.state!=='extractReady') return;
+    avail.push({id:q.name, cat:'supply', zone:'field extraction', side:q.side||2,
+      desc:`Extract ${q.type||'squad'} team ${q.name} — needs a transport`,
+      diff:2, xp:300, timer:q.remainingStateTime, pos:q.position});
+  });
+
+  return {avail, act};
+}
+
+// --- render ----------------------------------------------------------------
+function card(m, isActive){
+  const c=el('div','mc '+m.cat);
+  c.innerHTML=`<div class="mc-top">
+      <span class="mid">#${String(m.id).slice(0,16)}</span>
+      <span class="cat ${m.cat}">${m.cat.toUpperCase()}</span>
+      <span class="stars">${stars(m.diff)}</span></div>
+    <div class="zone"><span class="dot" style="background:${SIDE[m.side]}"></span>${m.zone}</div>
+    <div class="desc">${m.desc}</div>
+    ${isActive?`<div class="prog"><i style="width:${m.prog}%"></i></div>`:''}
+    <div class="mc-foot"><span class="xp">+${m.xp} XP</span>
+      <span class="meta">${isActive?m.prog.toFixed(0)+'%':
+        m.timer?'expires '+mmss(m.timer): m.res?Math.round(m.res/1000)+'k res':''}</span></div>`;
+  return c;
+}
+
+function renderList(){
+  const {avail,act}=missions();
+  const a=avail.filter(m=>active.has(m.cat)), b=act.filter(m=>active.has(m.cat));
+  const L=$('#list'); L.innerHTML='';
+  const mk=(title,arr,isAct)=>{
+    const col=el('div','col');
+    col.appendChild(el('h3',null,`${title} <span>${arr.length}</span>`));
+    if(!arr.length) col.appendChild(el('div','empty','nothing here'));
+    arr.forEach(m=>col.appendChild(card(m,isAct)));
+    return col;
+  };
+  L.appendChild(mk('AVAILABLE',a,false));
+  L.appendChild(mk('ACTIVE',b,true));
+}
+
+function renderMap(gci){
+  gZones.clearLayers(); gUnits.clearLayers(); gTrk.clearLayers();
+  const live=D.live, c=D.campaign;
+  const bases=(live&&live.world&&live.world.bases)||[];
+  const byName={}; bases.forEach(b=>byName[b.n.toLowerCase()]=b);
+
+  // Zone positions, in order of trust:
+  //   1. the live airbase, when gRPC is running and the names match
+  //   2. zones.json, derived offline from the mission's own trigger zones
+  //
+  // (2) is why the map works at all with the server asleep, and why zones that
+  // are not airbases -- Alpha, Oil Fields, Distillery -- can be drawn.
+  const zpos=(D.zones&&D.zones.zones)||{};
+  const placed=[];
+
+  if(c) Object.values(c.zones||{}).forEach(z=>{
+    const b=byName[(z.name||'').toLowerCase()];
+    const fallback=zpos[z.name];
+    const ll = b ? [b.lat,b.lon] : (Array.isArray(fallback)?fallback:null);
+    if(!ll) return;
+    placed.push(ll);
+    L.circleMarker(ll,{radius:z.distToFront<=1?9:6,color:SIDE[z.side],weight:2,
+      fillColor:SIDE[z.side],fillOpacity:.35})
+      .bindPopup(`<b>${z.name}</b><br>${z.side===2?'BLUE':z.side===1?'RED':'neutral'}<br>
+        resources ${Math.round((z.resource||0)/1000)}k · ${z.distToFront} from front`)
+      .addTo(gZones);
+  });
+
+  // Contested zones (distToFront <= 1) get a halo, so the front reads at a
+  // glance instead of having to compare 61 dot colours.
+  if(c) Object.values(c.zones||{}).forEach(z=>{
+    if((z.distToFront??9) > 1) return;
+    const b=byName[(z.name||'').toLowerCase()];
+    const fb=zpos[z.name];
+    const ll = b ? [b.lat,b.lon] : (Array.isArray(fb)?fb:null);
+    if(!ll) return;
+    L.circleMarker(ll,{radius:15,color:SIDE[z.side],weight:1,opacity:.35,
+      fill:false,dashArray:'3 4'}).addTo(gZones);
+  });
+
+  if(c) Object.values(c.csarTracker||{}).forEach(p=>{
+    const ll=toLL(p.pos); if(!ll) return;
+    L.circleMarker(ll,{radius:7,color:'#3fd07a',weight:2,fillOpacity:.5})
+      .bindPopup(`<b>${p.name}</b><br>downed pilot · ${mmss(p.remainingTime)} left`).addTo(gZones);
+  });
+
+  // Everything below comes from the campaign save, so the map is populated
+  // whether or not DCS-gRPC is running. Positions are up to ~60s old --
+  // Pretense's save interval -- which the footer says out loud.
+  const AIR = {tanker:'TKR', awacs:'AWACS', strike:'STRIKE', cap:'CAP',
+               patrol:'CAP', supply_air:'SUPPLY', assault:'ASSAULT',
+               transport:'TRANSPORT', csar:'CSAR'};
+
+  Object.values((c&&c.activeGroups)||{}).forEach(g=>{
+    const ll=toLL(g.position); if(!ll) return;
+    const side = /-blue(-|$)/.test(g.productName||'') ? 2
+               : /-red(-|$)/.test(g.productName||'') ? 1 : 0;
+    const air = (g.position.y||0) > 150;
+    const label = AIR[g.type] || (g.type||'').toUpperCase().slice(0,8);
+    L.circleMarker(ll,{radius:air?5:4,color:SIDE[side],weight:air?2:1,
+      fillColor:SIDE[side],fillOpacity:air?.85:.4})
+      .bindPopup(`<b>${esc(label)}</b><br>${esc(g.productName||'')}<br>
+        ${esc(g.homeName||'?')} &rarr; ${esc(g.targetName||'?')}<br>
+        ${air?Math.round(g.position.y)+' m':'on the ground'}`)
+      .addTo(gUnits);
+    if(gci && air){
+      L.marker(ll,{icon:L.divIcon({className:'',iconAnchor:[-7,6],
+        html:`<div class="trk" style="color:${SIDE[side]}">${esc(label)}<br>FL${
+          String(Math.round(g.position.y*3.28/100)).padStart(3,'0')}</div>`})})
+        .addTo(gTrk);
+    }
+  });
+
+  // Ground squads: the ones marked extractReady are a job for a transport.
+  Object.values((c&&c.squadTracker)||{}).forEach(q=>{
+    const ll=toLL(q.position); if(!ll) return;
+    const ready = q.state==='extractReady';
+    L.circleMarker(ll,{radius:ready?7:4,color:ready?'#ffc848':SIDE[q.side||0],
+      weight:ready?2:1,fillOpacity:ready?.6:.25})
+      .bindPopup(`<b>${esc(q.type||'squad')}</b> ${esc(q.name)}<br>
+        ${esc(q.state||'')}<br>${mmss(q.remainingStateTime||0)} left`)
+      .addTo(gZones);
+  });
+
+  Object.values((c&&c.carriers)||{}).forEach(cv=>{
+    const ll = toLL(cv.position && cv.position.p); if(!ll) return;
+    L.circleMarker(ll,{radius:8,color:'#4a9eff',weight:2,fillColor:'#0b1520',
+      fillOpacity:.9})
+      .bindPopup(`<b>${esc(cv.name)}</b><br>${(cv.aliveGroupMembers||[]).length} hull(s)<br>
+        ${Math.round((cv.resource||0)/1000)}k resources`)
+      .addTo(gZones);
+  });
+
+  const units=(live&&live.world&&live.world.units)||[];
+  units.forEach(u=>{
+    const col=SIDE[u.c]||SIDE[0], isP=!!u.p;
+    L.circleMarker([u.lat,u.lon],{radius:isP?6:3,color:isP?'#ffb020':col,
+      weight:isP?2:1,fillColor:col,fillOpacity:.8})
+      .bindPopup(`<b>${isP?u.p:u.t}</b><br>${u.t}<br>${u.alt} m`).addTo(gUnits);
+    if(gci&&u.cat<=1){
+      L.marker([u.lat,u.lon],{icon:L.divIcon({className:'',iconAnchor:[-7,6],
+        html:`<div class="trk" style="color:${col}">${isP?u.p:u.t}<br>FL${String(Math.round(u.alt*3.28/100)).padStart(3,'0')}</div>`})})
+        .addTo(gTrk);
+    }
+  });
+
+  if(!mapReady){
+    const pts=[...placed,...bases.map(b=>[b.lat,b.lon]),...units.map(u=>[u.lat,u.lon])];
+    if(pts.length){
+      // Reserve room for the intel panel, or the eastern zones sit underneath it.
+      map.fitBounds(L.latLngBounds(pts).pad(.15),
+        gci ? {paddingBottomRight:[320,0]} : undefined);
+      mapReady=true;
+    }
+  }
+}
+
+// The GCI view is a controller's station, not just a map with labels: what is
+// contested, who is airborne, who needs picking up. All of it comes from the
+// campaign save, so it works with the server asleep.
+// The event feed is the only thing on this board that is genuinely real-time:
+// it comes from a persistent gRPC stream, not a 15s poll of a save file.
+function feedRows(n){
+  const f = (D.feed && D.feed.feed) || [];
+  if(!f.length) return '<div class="none">nothing yet this session</div>';
+  return f.slice(0, n).map(e=>`<div class="fe ${esc(e.k)}">
+    <span class="ft">${ago(Date.now()/1000 - e.ts)}</span>
+    <span class="fk">${esc(String(e.k).toUpperCase())}</span>
+    <span class="fx">${esc(e.t)}</span></div>`).join('');
+}
+
+function renderGci(){
+  const c=D.campaign; const el=$('#gci');
+  if(!c){ el.innerHTML='<div class="none">No campaign data.</div>'; return; }
+
+  const zones=Object.values(c.zones||{});
+  const blue=zones.filter(z=>z.side===2).length, red=zones.filter(z=>z.side===1).length;
+
+  const rows=(arr,empty)=>arr.length
+    ? arr.join('')
+    : `<div class="none">${empty}</div>`;
+
+  // Priority objectives the campaign itself has nominated.
+  const pri=Object.values((c.battlefieldManager&&c.battlefieldManager.priorityZones)||{});
+  const ovr=(c.battlefieldManager&&c.battlefieldManager.overridePriorityZones)||[];
+  const priList=[...ovr,...pri].filter(Boolean);
+
+  // Contested = adjacent to the front. Sorted by how exposed they are.
+  const front=zones.filter(z=>(z.distToFront??9)<=1)
+    .sort((a,b)=>(a.closestEnemyDist||0)-(b.closestEnemyDist||0));
+
+  const air=Object.values(c.activeGroups||{}).filter(g=>(g.position&&g.position.y||0)>150);
+  const byType={};
+  air.forEach(g=>{ const t=(g.type||'other'); byType[t]=(byType[t]||0)+1; });
+
+  const csar=Object.values(c.csarTracker||{}).sort((a,b)=>a.remainingTime-b.remainingTime);
+  const squads=Object.values(c.squadTracker||{}).filter(q=>q.state==='extractReady')
+    .sort((a,b)=>a.remainingStateTime-b.remainingStateTime);
+  const carriers=Object.values(c.carriers||{});
+
+  el.innerHTML=`
+    <h3>Front</h3>
+    <div class="tot">
+      <span class="kv" style="color:var(--blue)">BLUE ${blue}</span>
+      <span class="kv" style="color:var(--red)">RED ${red}</span>
+      <span class="kv">${air.length} airborne</span>
+    </div>
+
+    <h3>Priority objectives</h3>
+    ${rows(priList.map(n=>`<div class="row"><span class="nm">${esc(n)}</span></div>`),
+           'none nominated')}
+
+    <h3>Contested (${front.length})</h3>
+    ${rows(front.map(z=>`<div class="row">
+        <span class="nm"><span class="dot" style="background:${SIDE[z.side]}"></span>
+          ${esc(z.name)}</span>
+        <span class="rt">${Math.round((z.closestEnemyDist||0)/1000)} km</span></div>`),
+        'front is quiet')}
+
+    <h3>Air activity</h3>
+    ${rows(Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([t,n])=>
+        `<div class="row"><span class="nm">${esc(t.replace(/_/g,' '))}</span>
+         <span class="rt">${n}</span></div>`), 'nothing airborne')}
+
+    <h3>CSAR (${csar.length})</h3>
+    ${rows(csar.map(p=>`<div class="row">
+        <span class="nm">${esc(p.name)}</span>
+        <span class="rt ${p.remainingTime<600?'warn':''}">${mmss(p.remainingTime)}</span>
+      </div>`), 'no downed pilots')}
+
+    <h3>Awaiting extraction (${squads.length})</h3>
+    ${rows(squads.map(q=>`<div class="row">
+        <span class="nm">${esc(q.type||'squad')} &middot; ${esc(q.name)}</span>
+        <span class="rt ${q.remainingStateTime<600?'warn':''}">${mmss(q.remainingStateTime)}</span>
+      </div>`), 'none waiting')}
+
+    <h3>On the radio</h3>
+    ${rows(((D.live&&D.live.env&&D.live.env.srs)||[]).map(c=>`<div class="row">
+        <span class="nm">${esc(c.n)}</span>
+        <span class="rt">${c.f?(c.f/1e6).toFixed(3)+' MHz':''}</span></div>`),
+        'no SRS clients')}
+
+    <h3>Recent activity</h3>
+    <div class="feed">${feedRows(12)}</div>
+
+    <h3>Naval</h3>
+    ${rows(carriers.map(cv=>`<div class="row">
+        <span class="nm">${esc(cv.name)}</span>
+        <span class="rt">${Math.round((cv.resource||0)/1000)}k</span></div>`),
+        'no carriers')}`;
+}
+
+// A map should say what it is showing, rather than leaving gaps to be guessed at.
+function mapNote(){
+  const st=D.status, age=st?Date.now()/1000-st.ts:1e9;
+  const on=st&&st.online&&age<STALE;
+  const zn=Object.keys((D.zones&&D.zones.zones)||{}).length;
+  const players=((D.live&&D.live.world&&D.live.world.units)||[]).length;
+  const ai=Object.values((D.campaign&&D.campaign.activeGroups)||{})
+    .filter(g=>(g.position&&g.position.y||0)>150).length;
+
+  const bits=[];
+  if(!zn){ bits.push('Zone positions unavailable'); }
+  else {
+    bits.push(`${zn} zones mapped`);
+    // Say where each number comes from and how old it is. A map that implies
+    // live tracking when it is a minute behind is worse than no map.
+    if(ai) bits.push(`${ai} AI contacts from the campaign feed (~1 min old)`);
+    if(players) bits.push(`${players} player aircraft, live`);
+    else if(on) bits.push('player positions need DCS-gRPC');
+    if(!on) bits.push('server offline \u2014 last known picture');
+  }
+  const el=$('#mapnote'); if(el) el.textContent=bits.join('  \u00b7  ');
+}
+
+// Weather and the mission clock exist only because DCS-gRPC is running. When
+// it is not, these chips are omitted rather than shown empty -- a blank
+// temperature reads as "0 degrees", which is a lie.
+function envChips(){
+  const e = D.live && D.live.env;
+  if(!e) return '';
+  const bits = [];
+  const hh = String(e.hh ?? 0).padStart(2,'0'), mm = String(e.mm ?? 0).padStart(2,'0');
+  bits.push(`<div class="chip" title="Mission time, not wall clock">&#128336; <b>${hh}:${mm}</b></div>`);
+  if(e.tempC !== null && e.tempC !== undefined)
+    bits.push(`<div class="chip">&#127777; <b>${e.tempC}&deg;C</b></div>`);
+  if(e.qnh) bits.push(`<div class="chip" title="QNH">&#127756; <b>${e.qnh}</b> hPa</div>`);
+  // proto3 omits zero values, so absent wind speed means calm, not unknown.
+  bits.push(`<div class="chip" title="Surface wind">&#127788; <b>${
+    e.windMs ? `${String(e.windDir).padStart(3,'0')}&deg; / ${e.windMs} m/s` : 'calm'}</b></div>`);
+  return bits.join('\n    ');
+}
+
+function renderHeader(){
+  const s=D.status, c=D.campaign;
+  const age=s?Date.now()/1000-s.ts:1e9, on=s&&s.online&&age<STALE;
+  const zones=Object.values((c&&c.zones)||{});
+  const blue=zones.filter(z=>z.side===2).length, red=zones.filter(z=>z.side===1).length;
+  const {avail,act}=missions();
+
+  $('#hPlay').textContent=on?(s.players||0):0;
+  $('#hZones').textContent=`${blue}/${blue+red}`;
+
+  $('#tabs').innerHTML=`<div class="tab on">
+      <span class="dot ${on?'on':'off'}"></span>
+      <span><div class="nm">Caucasus</div><div class="era">PRETENSE · MODERN</div></span>
+      <span class="pill av">${avail.length}</span><span class="pill ac">${act.length}</span>
+    </div>`;
+
+  $('#strip').innerHTML=`
+    <div class="chip"><span class="dot ${on?'on':'off'}"></span>
+      <b>${on?'RUNNING':'OFFLINE'}</b>${on?'':' · '+ago(age)+' ago'}</div>
+    <div class="chip">&#128100; <b>${on?s.players:0}</b> pilots</div>
+    <div class="chip">&#9889; <b>${on?s.fps:'—'}</b> sim FPS</div>
+    <div class="chip" style="color:var(--blue)">BLUE <b>${blue}</b></div>
+    <div class="chip" style="color:var(--red)">RED <b>${red}</b></div>
+    ${envChips()}
+    <div class="chip" title="click to copy">&#128225; <b id="cp">${s?s.address:'—'}</b></div>`;
+  const cp=$('#cp'); if(cp&&s) cp.parentElement.onclick=()=>navigator.clipboard.writeText(s.address);
+}
+
+// The floating header is not a fixed height. It grows with content (mission
+// tabs, status chips) and with viewport width, because #ctl is flex-wrap:wrap
+// -- adding the Pilots/History/Files buttons made it wrap one row sooner on a
+// narrow window. #main clears the header with padding, so that number cannot
+// be a constant: when it was, panels slid underneath it.
+function syncHeaderHeight(){
+  const el = $('#hdr');
+  if(!el || typeof el.getBoundingClientRect !== 'function') return;
+  const root = document.documentElement;
+  if(!root || !root.style || !root.style.setProperty) return;
+  // 12px because #hdr is inset from the top, plus 12px of breathing room.
+  const h = Math.ceil(el.getBoundingClientRect().height) + 24;
+  if(h > 0) root.style.setProperty('--hdrh', h + 'px');
+}
+
+function renderCats(){
+  $('#cats').innerHTML=CATS.map(c=>
+    `<button class="fb ${active.has(c)?'on':''}" data-c="${c}">${c.toUpperCase()}</button>`).join('');
+  $('#cats').querySelectorAll('.fb').forEach(b=>b.onclick=()=>{
+    const c=b.dataset.c; active.has(c)?active.delete(c):active.add(c);
+    renderCats(); draw();
+  });
+}
+
+// --- Pilots -----------------------------------------------------------------
+//
+// Pretense's player_stats.json is Lua-shaped, so two things bite here: a
+// player with no stats yet serialises as an empty ARRAY rather than an object,
+// and the online roster uses DCS display names that must be matched against
+// these keys exactly.
+
+function pilotRows(){
+  const st=(D.pilots&&D.pilots.stats)||{};
+  const online=new Set(((D.status&&D.status.names)||[]).map(n=>
+    typeof n==='object'?n.n:n));
+  return Object.entries(st).map(([name,v])=>{
+    const o = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
+    const live=((D.status&&D.status.names)||[]).find(x=>
+      (typeof x==='object'?x.n:x)===name);
+    const slot=(((D.pilots&&D.pilots.players)||[]).find(p=>p.name===name)||{}).unit;
+    return {name, xp:+o.XP||0, cmd:+o.CMD||0, sb:+o.SB||0, on:online.has(name),
+            role:roleOf(name), side:live&&typeof live==='object'?+live.s||0:0,
+            unit:slot||null, cfg:((D.pilots&&D.pilots.config)||{})[name]||null,
+            cb:((D.combat&&D.combat.pilots)||{})[name]||null,
+            kd:((D.kd&&D.kd.pilots)||{})[name]||null};
+  }).sort((a,b)=>b.xp-a.xp);
+}
+
+// Only tiles backed by real data are emitted. Pretense records XP, a 'cmd'
+// counter and a survival bonus -- it does not record kills or deaths, so there
+// are no such tiles until something actually produces those numbers.
+// Squadron-wide aggregates. Every figure is summed from data that exists --
+// nothing is shown that would be zero purely because the source is missing.
+function squadronTotals(rows){
+  const sum = (f) => rows.reduce((a,r)=>a + (f(r)||0), 0);
+  const sorties = sum(r=>r.cb&&r.cb.sorties);
+  const kills   = sum(r=>r.kd&&r.kd.kills);
+  const losses  = sum(r=>r.cb&&r.cb.deaths);
+  const mins    = sum(r=>{ const sn=(D.seen||{})[r.name]; return sn&&sn.minutes; });
+  const c = D.campaign, zs = Object.values((c&&c.zones)||{});
+  const blue = zs.filter(z=>z.side===2).length;
+
+  const t=[];
+  if(mins)    t.push(`<div><b>${flown(mins)}</b><span>Flown</span></div>`);
+  if(sorties) t.push(`<div><b>${sorties}</b><span>Sorties</span></div>`);
+  if(kills)   t.push(`<div><b>${kills}</b><span>Kills</span></div>`);
+  if(losses)  t.push(`<div><b>${losses}</b><span>Losses</span></div>`);
+  if(zs.length) t.push(`<div><b>${blue}/${zs.length}</b><span>Zones held</span></div>`);
+  return t.length ? `<div class="tot2">${t.join('')}</div>` : '';
+}
+
+function pilotCard(r, pos, count, total, leader){
+  const av=avatar(r.name);
+  const share=total?Math.round(r.xp/total*100):0;
+  const gap=leader-r.xp;
+
+  const seen=(D.seen||{})[r.name]||null;
+  const pills=[];
+  if(r.unit) pills.push(`<span class="pill2">${esc(r.unit)}</span>`);
+  if(r.on) pills.push(`<span class="pill2 ${r.side===1?'r':'b'}">${
+    r.side===1?'RED':r.side===2?'BLUE':'SPECTATOR'}</span>`);
+  if(r.role) pills.push(`<span class="badge role">${esc(r.role.tag)}</span>`);
+
+  const notes=[];
+  if(r.role) notes.push(esc(r.role.title));
+
+  notes.push(r.on
+    ? (r.unit?`Airborne now in a <b>${esc(r.unit)}</b>.`:'Connected now.')
+    : (seen&&seen.last
+        ? `Not connected — last seen <b>${ago(Date.now()/1000-seen.last)} ago</b>.`
+        : 'Not connected.'));
+  notes.push(`Holds <b>${share}%</b> of the squadron's total XP` +
+    (gap>0?`, <b>${gap.toLocaleString()}</b> behind the leader.`:' — currently top of the board.'));
+
+  if(r.cb){
+    const cw=r.cb;
+    // Sorties with no weapons released means transport or recce, which is a
+    // role worth naming rather than showing as a row of zeroes.
+    if(cw.sorties && !cw.shots && !cw.hits){
+      notes.push('Flies <b>support</b> — sorties logged, no weapons released.');
+    } else if(cw.shots || cw.hits){
+      notes.push(`<b>${(cw.shots||0).toLocaleString()}</b> weapons released, ` +
+        `<b>${(cw.hits||0).toLocaleString()}</b> ` +
+        `<span title="One hit is logged per impact, so a cannon burst counts many. This is activity, not accuracy.">impacts</span>.`);
+    }
+    if(cw.ejects) notes.push(`Ejected <b>${cw.ejects}</b> time(s).`);
+  }
+  // Only OVERLORD has scope settings, so this line appears for exactly one person.
+  if(r.cfg && r.cfg.gci_warning_radius!==undefined){
+    notes.push(`GCI scope set to a <b>${r.cfg.gci_warning_radius}</b> ` +
+      `${r.cfg.gci_metric?'km':'nm'} warning radius.`);
+  }
+
+  // A third-width card fits four tiles before the labels wrap, and there can
+  // be eight candidates. Rank moved to the corner badge; the rest are offered
+  // in the order a pilot would care about them and the list is then capped.
+  //
+  // Combat numbers come from the DCS log via pilot-stats.ps1. There is
+  // deliberately no Kills tile: DCS emits no kill event at all, and inferring
+  // one from hit-then-death misattributes assists and splash damage.
+  const cb=r.cb;
+  const TILE_CAP=4;
+  // Kills come from gRPC's KillEvent -- a recorded kill, not the hit-then-death
+  // guess I refused to ship off the DCS log, which has no kill event at all.
+  const kd = r.kd;
+  const ratio = (kd && kd.deaths) ? (kd.kills / kd.deaths).toFixed(2)
+              : (kd ? String(kd.kills || 0) : null);
+
+  const candidates=[
+    [true,               r.xp.toLocaleString(),        'XP'],
+    [!!(kd&&kd.kills),   kd&&kd.kills,                 'Kills'],
+    [!!(kd&&(kd.kills||kd.deaths)), ratio,             'K/D'],
+    [!!(kd&&kd.traps),   kd&&kd.traps,                 'Traps'],
+    [!!cb,               cb&&(cb.sorties||0),          'Sorties'],
+    [!!cb,               cb&&(cb.deaths||0),           'Losses'],
+    [!!(seen&&seen.minutes>=1), seen&&flown(seen.minutes), 'Flown'],
+    [!!cb,               cb&&(cb.landings||0),         'Landings'],
+    [!!(seen&&seen.sessions), seen&&seen.sessions,     'Sessions'],
+    [!!r.sb,             r.sb,                         'Survival'],
+    [!!r.cmd,            r.cmd,                        'Commands'],
+    [!cb,                share+'%',                    'Share'],
+  ];
+  const tiles=candidates.filter(c=>c[0]).slice(0,TILE_CAP)
+    .map(c=>`<div><b>${c[1]}</b><span>${c[2]}</span></div>`);
+
+  return `<div class="pcard${pos<=3?' p'+pos:''}" style="--avb:${av.bg};--avf:${av.fg}">
+    <div class="prank">#${pos}</div>
+    <div class="phead">
+      <div class="pav">${esc(av.initials)}</div>
+      <div>
+        <div class="pname">${esc(r.name)}${
+          r.on?' <span class="badge on">FLYING</span>':''}</div>
+        <div class="ppills">${pills.join('')}</div>
+        <div class="pnote">${notes.join('<br>')}</div>
+      </div>
+    </div>
+    <div class="pstats">${tiles.join('')}</div>
+  </div>`;
+}
+
+function renderPilots(){
+  const rows=pilotRows();
+  if(!rows.length){ $('#panel').innerHTML=
+    '<div class="pnl"><h2>Pilot roster</h2><div class="empty">No pilot stats yet.</div></div>';
+    return; }
+  const tot=rows.reduce((a,r)=>a+r.xp,0);
+
+  $('#panel').innerHTML=`<div class="pnl wide">
+    <h2>Pilot roster</h2>
+    <div class="sub">${rows.length} pilots &middot; ${tot.toLocaleString()} XP earned on this campaign.
+      XP comes from Pretense; it carries across sessions and is never reset by a restart.</div>
+    ${squadronTotals(rows)}
+    ${rows.filter(r=>r.role).map(r=>`<div class="roles">
+       <b>${esc(r.role.tag)}</b> &mdash; ${esc(r.name)} &middot; ${esc(r.role.title)}</div>`).join('')}
+    <div class="pgrid">
+      ${rows.map((r,i)=>pilotCard(r, i+1, rows.length, tot, rows[0].xp)).join('')}
+    </div>
+  </div>`;
+}
+
+// --- Campaign history -------------------------------------------------------
+//
+// history.json is sampled by the publisher on the box, because Pretense only
+// ever writes CURRENT state -- yesterday's front line is gone the moment it
+// saves. Points land every 10 minutes, or immediately when a zone flips.
+
+function renderHistory(){
+  const h=(D.history||[]).filter(p=>p&&p.t&&(p.b+p.r)>0);
+  if(h.length<2){ $('#panel').innerHTML=
+    `<div class="pnl"><h2>Campaign history</h2>
+     <div class="empty">Not enough history yet &mdash; the front line is sampled every 10 minutes while the server runs.
+     ${h.length?'1 point so far.':''}</div></div>`;
+    return; }
+
+  const W=1000, H=200, PAD=4;
+  const t0=h[0].t, t1=h[h.length-1].t, span=Math.max(1,t1-t0);
+  const x=p=>((p.t-t0)/span)*W;
+  const maxZ=Math.max(...h.map(p=>p.b+p.r),1);
+  const yy=v=>H-PAD-(v/maxZ)*(H-PAD*2);
+
+  const line=h.map((p,i)=>`${i?'L':'M'}${x(p).toFixed(1)},${yy(p.b).toFixed(1)}`).join('');
+  const area=`${line}L${W},${H}L0,${H}Z`;
+  const rline=h.map((p,i)=>`${i?'L':'M'}${x(p).toFixed(1)},${yy(p.r).toFixed(1)}`).join('');
+
+  const first=h[0], last=h[h.length-1];
+  const delta=last.b-first.b;
+  const dtxt = delta>0?`+${delta} zones to BLUE`:delta<0?`${delta} zones to BLUE`:'no net change';
+
+  $('#panel').innerHTML=`<div class="pnl">
+    <h2>Campaign history</h2>
+    <div class="sub">${h.length} samples over ${ago(t1-t0)} &middot; <b>${dtxt}</b> in that window.</div>
+    <div class="tlk">
+      <span><i style="background:var(--blue)"></i>Blue zones</span>
+      <span><i style="background:var(--red)"></i>Red zones</span>
+    </div>
+    <div class="tlwrap">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <path d="${area}" fill="var(--blue)" opacity=".14"/>
+        <path d="${line}" fill="none" stroke="var(--blue)" stroke-width="2"
+              vector-effect="non-scaling-stroke"/>
+        <path d="${rline}" fill="none" stroke="var(--red)" stroke-width="2"
+              stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <div class="tlx">
+        <span>${new Date(t0*1000).toLocaleString()}</span>
+        <span>${last.b} blue &middot; ${last.r} red</span>
+        <span>${new Date(t1*1000).toLocaleString()}</span>
+      </div>
+    </div></div>`;
+}
+
+// --- Files ------------------------------------------------------------------
+//
+// Deliberately links to sources rather than rehosting. Two reasons: 2.4 GB of
+// mods through CloudFront costs real money per download, and pointing pilots
+// at a private copy of somebody else's mod is how people end up on a build
+// that does not match the server.
+//
+// The VERSIONS are the load-bearing part of this page. A mod aircraft only
+// appears in the dynamic-spawn list if the client has the same build the
+// server does, and the failure mode is a silently missing airframe.
+
+const FILES=[
+  {n:'DCS World',            v:'2.9.28.26385', src:'https://www.digitalcombatsimulator.com/en/downloads/world/',
+   d:'The server tracks stable. If your client is on a different build you cannot join at all.'},
+  {n:'DCS-SimpleRadio Standalone', v:'2.3.8.2', src:'https://github.com/ciribob/DCS-SimpleRadioStandalone/releases',
+   d:'Voice comms on port 5002. The client auto-connects when you join; version must match the server exactly.'},
+  {n:'Su-30MKI "Flanker Ex"', v:'Su-30_EFM_V2.8.06b', src:'',
+   d:'Codename Flanker. Install to Saved Games\\DCS\\Mods\\aircraft\\.'},
+  {n:'Hercules',             v:'6.8.2',        src:'',
+   d:'Anubis C-130J. Install to Saved Games\\DCS\\Mods\\aircraft\\.'},
+  {n:'UH-60L Black Hawk',    v:'2.1.5',        src:'',
+   d:'Kinkku. Also gives you UH-60L_DAP and the KC-130J tanker. Its Scripts\\Hooks\\bhHook.lua goes in YOUR Saved Games (it drives the door gunners) — it is deliberately not on the server.'}
+];
+
+function renderFiles(){
+  $('#panel').innerHTML=`<div class="pnl">
+    <h2>Files &amp; versions</h2>
+    <div class="req"><b>Versions must match the server exactly.</b>
+      A mod aircraft you have on a different build simply will not appear in your
+      spawn list &mdash; there is no error message. If an airframe is missing, check
+      the version here first.</div>
+    <div class="dl">
+      ${FILES.map(f=>`<div class="dlc">
+        <div class="n">${esc(f.n)}</div>
+        <div class="v">${esc(f.v)}</div>
+        <div class="d">${f.d}</div>
+        <div style="margin-top:10px">${f.src
+          ? `<a href="${f.src}" target="_blank" rel="noopener noreferrer">Download &rarr;</a>`
+          : '<span class="ask">Ask in Discord for the download link</span>'}</div>
+      </div>`).join('')}
+    </div>
+    <div class="sub" style="margin-top:20px">Server <b>${D.status?esc(D.status.address):'—'}</b>
+      &middot; SRS <b>${D.status&&D.status.srs?esc(D.status.srs):'—'}</b></div>
+  </div>`;
+}
+
+const PANELS={pilots:renderPilots, history:renderHistory, files:renderFiles};
+
+function draw(){
+  renderHeader();
+  syncHeaderHeight();
+  const isList=view==='list', isPanel=!!PANELS[view], isMap=!isList&&!isPanel;
+
+  $('#list').style.display  = isList ?'grid' :'none';
+  $('#map').style.display   = isMap  ?'block':'none';
+  $('#panel').style.display = isPanel?'block':'none';
+
+  // The category filter only means anything against mission cards.
+  $('#cats').style.display = isList?'flex':'none';
+  $('#cats').previousElementSibling.style.display = isList?'':'none';
+
+  $('#mapnote').style.display  = isMap?'block':'none';
+  $('#intel').style.display    = isMap?'block':'none';
+  $('#gci').style.display      = (isMap&&intel)?'block':'none';
+  $('#intel').classList.toggle('on', intel);
+
+  if(isList) renderList();
+  else if(isPanel) PANELS[view]();
+  else { map.invalidateSize(); renderMap(intel); mapNote();
+         if(intel) renderGci(); }
+}
+
+$('#views').querySelectorAll('.sb').forEach(b=>b.onclick=()=>{
+  view=b.dataset.v;
+  $('#views').querySelectorAll('.sb').forEach(x=>x.classList.toggle('on',x===b));
+  draw();
+});
+
+$('#intel').onclick=()=>{
+  intel=!intel;
+  try { localStorage.setItem('sf-intel', intel?'1':'0'); } catch(e) {}
+  // The map's usable width changes when the panel appears, so Leaflet has to
+  // be told before anything is redrawn against the new size.
+  map.invalidateSize();
+  draw();
+};
+
+async function tick(){
+  const [st,cp,lv,pl,hs,sn]=await Promise.all([
+    grab('status.json'),grab('campaign.json'),grab('live.json'),
+    grab('pilots.json'),grab('history.json'),grab('pilots-seen.json')]);
+  if(!D.zones) D.zones = await grab('zones.json');
+  const cb = await grab('combat.json'); if(cb) D.combat = cb;
+  const kd = await grab('combat-events.json'); if(kd) D.kd = kd;
+  const fd = await grab('events.json'); if(fd) D.feed = fd;
+  D.status=st; D.campaign=cp;
+  // Keep the last good copy: a 403 while the server is asleep should not blank
+  // a leaderboard that is perfectly valid history.
+  if(pl) D.pilots=pl;
+  if(sn) D.seen=sn;
+  if(Array.isArray(hs)) D.history=hs;
+  // Live data outlives the server by design; ignore it once stale or the map
+  // shows aircraft frozen in mid-air from days ago.
+  D.live = lv && (Date.now()/1000-lv.ts)<STALE ? lv : null;
+  draw();
+  $('#upd').textContent='updated '+new Date().toLocaleTimeString();
+}
+renderCats(); syncHeaderHeight(); tick(); setInterval(tick,POLL);
+
+// ResizeObserver catches wraps caused by width changes AND by content changes;
+// the resize listener is the fallback for browsers without it.
+if(typeof ResizeObserver !== 'undefined' && $('#hdr')){
+  new ResizeObserver(syncHeaderHeight).observe($('#hdr'));
+} else if(typeof addEventListener === 'function'){
+  addEventListener('resize', syncHeaderHeight);
+}
+</script>
+</body>
+</html>

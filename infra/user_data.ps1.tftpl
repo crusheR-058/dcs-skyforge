@@ -1,0 +1,138 @@
+<powershell>
+# ---------------------------------------------------------------------------
+# First-boot OS preparation for a DCS dedicated server.
+#
+# This runs ONCE, as SYSTEM, on the very first boot. It only prepares Windows.
+# Installing DCS itself is a manual step (the ED installer needs a login and a
+# desktop session) -- see README.md, Phase 2. After installing DCS, run
+# server\setup.ps1 to register the auto-start and watchdog tasks.
+# ---------------------------------------------------------------------------
+
+$ErrorActionPreference = 'Continue'
+$log = 'C:\dcs-state\bootstrap.log'
+
+New-Item -ItemType Directory -Force -Path 'C:\dcs-state' | Out-Null
+Start-Transcript -Path $log -Append
+
+Write-Output "=== DCS server bootstrap starting $(Get-Date -Format o) ==="
+
+# --- Timezone -------------------------------------------------------------
+# Matters more than it looks: the idle watchdog logs and the nightly backstop
+# stop are far easier to reason about when the guest clock matches the cron.
+try {
+    Set-TimeZone -Id '${windows_timezone}'
+    Write-Output "Timezone set to ${windows_timezone}"
+} catch {
+    Write-Output "Timezone failed: $($_.Exception.Message)"
+}
+
+# --- Power ----------------------------------------------------------------
+# High performance plan; never sleep, never blank. A sleeping server looks
+# exactly like a crashed one to your friends.
+powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+powercfg /change standby-timeout-ac 0
+powercfg /change monitor-timeout-ac 0
+Write-Output 'Power plan set to High performance, sleep disabled'
+
+# --- Page file ------------------------------------------------------------
+# Windows' system-managed page file would size itself against 32 GB of RAM and
+# claim roughly that much disk. That is ~$2.92/month of EBS, billed 730 hrs a
+# month, to hold a file a headless DCS server will never meaningfully touch --
+# the whole point of 32 GB is that we do not page. Cap it at 8 GB, which is
+# ample for crash dumps and the odd spike.
+try {
+    $computer = Get-CimInstance -ClassName Win32_ComputerSystem
+    if ($computer.AutomaticManagedPagefile) {
+        Set-CimInstance -InputObject $computer -Property @{ AutomaticManagedPagefile = $false }
+        Write-Output 'Disabled automatic page file management'
+    }
+
+    $pagefile = Get-CimInstance -ClassName Win32_PageFileSetting -ErrorAction SilentlyContinue
+    if ($pagefile) {
+        Set-CimInstance -InputObject $pagefile -Property @{ InitialSize = 8192; MaximumSize = 8192 }
+    } else {
+        New-CimInstance -ClassName Win32_PageFileSetting -Property @{
+            Name = 'C:\pagefile.sys'; InitialSize = 8192; MaximumSize = 8192
+        } | Out-Null
+    }
+    Write-Output 'Page file fixed at 8 GB (takes effect after reboot)'
+} catch {
+    Write-Output "Page file config failed: $($_.Exception.Message)"
+}
+
+# --- Firewall -------------------------------------------------------------
+# The security group already restricts what reaches the instance. These rules
+# are the second half: Windows Firewall must also allow the game port, or
+# connections are dropped inside the guest with no useful error.
+New-NetFirewallRule -DisplayName 'DCS Server TCP' -Direction Inbound `
+    -Protocol TCP -LocalPort ${dcs_port} -Action Allow -Profile Any | Out-Null
+New-NetFirewallRule -DisplayName 'DCS Server UDP' -Direction Inbound `
+    -Protocol UDP -LocalPort ${dcs_port} -Action Allow -Profile Any | Out-Null
+Write-Output 'Firewall: allowed DCS on ${dcs_port} TCP+UDP'
+
+%{ if enable_srs ~}
+New-NetFirewallRule -DisplayName 'DCS SRS TCP' -Direction Inbound `
+    -Protocol TCP -LocalPort ${srs_port} -Action Allow -Profile Any | Out-Null
+New-NetFirewallRule -DisplayName 'DCS SRS UDP' -Direction Inbound `
+    -Protocol UDP -LocalPort ${srs_port} -Action Allow -Profile Any | Out-Null
+Write-Output 'Firewall: allowed SRS on ${srs_port} TCP+UDP'
+%{ endif ~}
+
+# --- Windows Update -------------------------------------------------------
+# Download updates, but never install-and-reboot on our schedule. A surprise
+# reboot mid-sortie is the sort of thing that ends game night.
+$au = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU'
+New-Item -Path $au -Force | Out-Null
+Set-ItemProperty -Path $au -Name 'AUOptions' -Value 3 -Type DWord
+Set-ItemProperty -Path $au -Name 'NoAutoRebootWithLoggedOnUsers' -Value 1 -Type DWord
+Write-Output 'Windows Update set to download-but-notify, auto-reboot disabled'
+
+# --- IE Enhanced Security -------------------------------------------------
+# You have to browse to the Eagle Dynamics site once to fetch the installer.
+# ESC makes that genuinely painful. The box has no open admin ports, so this
+# is an acceptable trade for a one-off download.
+$escAdmin = 'HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}'
+if (Test-Path $escAdmin) {
+    Set-ItemProperty -Path $escAdmin -Name 'IsInstalled' -Value 0 -Type DWord
+    Write-Output 'IE Enhanced Security Configuration disabled for Administrators'
+}
+
+# --- AWS CLI --------------------------------------------------------------
+# The Amazon Windows AMI does NOT ship the AWS CLI, only AWS Tools for
+# PowerShell. That bit us once already: add-mission.ps1 published its result
+# through aws.exe alone, found nothing, and silently swallowed every upload
+# result so /dcs status could never report one.
+#
+# It also makes large transfers practical -- `aws s3 sync` is parallel and
+# resumable, which Read-S3Object is not, and an aircraft mod is ~900 files.
+try {
+    $msi = Join-Path $env:TEMP 'AWSCLIV2.msi'
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri 'https://awscli.amazonaws.com/AWSCLIV2.msi' -OutFile $msi -UseBasicParsing
+    Start-Process msiexec.exe -ArgumentList '/i', "`"$msi`"", '/qn', '/norestart' -Wait
+    [IO.File]::Delete($msi)
+
+    # msiexec updates the machine PATH, but this already-running process keeps
+    # its stale copy, so later steps in this script would not find aws.exe.
+    $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    Write-Output "AWS CLI installed: $(& 'C:\Program Files\Amazon\AWSCLIV2\aws.exe' --version 2>&1)"
+} catch {
+    Write-Output "AWS CLI install failed: $($_.Exception.Message)"
+}
+
+# --- State directory ------------------------------------------------------
+# The DCS hook script writes players.json here and the watchdog reads it.
+# Both run as SYSTEM/Administrators, but be explicit rather than lucky.
+$acl = Get-Acl 'C:\dcs-state'
+$rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+    'Users', 'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
+$acl.SetAccessRule($rule)
+Set-Acl -Path 'C:\dcs-state' -AclObject $acl
+Write-Output 'C:\dcs-state ready'
+
+Write-Output "=== Bootstrap complete $(Get-Date -Format o) ==="
+Write-Output 'NEXT: RDP in over the SSM tunnel, install DCS, then run server\setup.ps1'
+
+Stop-Transcript
+</powershell>
+<persist>true</persist>

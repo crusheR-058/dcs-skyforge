@@ -1,0 +1,57 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+# --- Required ---------------------------------------------------------------
+
+key_pair_name = "dcs-admin"
+admin_email   = "you@example.com"
+
+# --- Region and instance ----------------------------------------------------
+#
+# Option A -- Mumbai (default). Best national connectivity; no AMD Genoa.
+#
+#   region        = "ap-south-1"
+#   instance_type = "m7i.2xlarge"      # 4x Sapphire Rapids @ 3.2 GHz, 32 GB
+#   core_count       = 4
+#   threads_per_core = 1               # REQUIRED: halves the Windows licence
+#                                      # $0.4242 baseline + $0.184 = $0.6082/hr
+#
+# Option B -- Hyderabad. ~18% cheaper AND ~20% faster per core. Only pick it
+# if your friends' ping to ap-south-2 is comparable to ap-south-1.
+#
+#   region        = "ap-south-2"
+#   instance_type = "r7a.xlarge"       # 4x Zen 4 @ 3.7 GHz, 32 GB
+#   core_count       = 4
+#   threads_per_core = 1               # 7a has no SMT; 1 is the only valid value
+#                                      # $0.3140 baseline + $0.184 = $0.4980/hr
+
+region           = "ap-south-1"
+instance_type    = "m7i.2xlarge"
+core_count       = 4
+threads_per_core = 1
+
+# --- Storage ----------------------------------------------------------------
+# Billed 730 hrs/month regardless of use. Windows ~35 GB + DCS base ~20 GB +
+# ~20 GB per terrain. Every 10 GB trimmed saves $0.91/month, forever.
+
+root_volume_gb = 150
+
+# --- Cost controls ----------------------------------------------------------
+
+monthly_budget_usd = 60
+nightly_stop_cron  = "cron(0 3 * * ? *)" # 03:00 IST daily, backstop
+schedule_timezone  = "Asia/Kolkata"
+
+# --- Discord bot ------------------------------------------------------------
+# From Discord Developer Portal > Applications > your app.
+# Leave discord_public_key empty to skip deploying the bot.
+# Run bot\build.ps1 before `terraform apply`.
+
+discord_public_key = ""
+discord_guild_id   = "" # right-click your server > Copy Server ID
+discord_role_id    = "" # optional; restricts who can spend your money
+
+# --- Optional ---------------------------------------------------------------
+
+server_name = "dcs-server"
+dcs_port    = 10308
+enable_srs  = true
