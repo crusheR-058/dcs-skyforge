@@ -649,6 +649,216 @@ td.detcell{padding:0!important;background:rgba(10,14,20,.6);
   .pstats{margin-left:-18px}
 }
 
+
+/* ===================== PILOT OPERATIONS ===================== */
+.pops{padding:22px 26px 80px;max-width:1520px;margin:0 auto;
+  transition:padding-right .22s cubic-bezier(.4,0,.2,1)}
+/* Wide screens have room to keep the roster fully visible beside the drawer. */
+@media(min-width:1500px){
+  #panel.drawered .pops{padding-right:436px;max-width:none}
+}
+
+/* page header: title left, operational context right */
+.pop-head{display:flex;align-items:flex-end;justify-content:space-between;
+  gap:24px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--rule-2)}
+.pop-head h2{margin:0;font:600 17px/1.1 var(--ui);letter-spacing:.17em;
+  text-transform:uppercase;color:var(--ink)}
+.pop-head .sub{margin:6px 0 0;font:400 12px/1.5 var(--ui);color:var(--ink-3)}
+.pop-ctx{display:flex;gap:0;align-items:stretch;flex:none;
+  border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.pop-ctx div{padding:7px 13px;border-right:1px solid var(--rule);
+  font:500 10.5px/1.3 var(--mono);color:var(--ink-2);white-space:nowrap}
+.pop-ctx div:last-child{border-right:0}
+.pop-ctx .k{display:block;font-size:8.5px;letter-spacing:.17em;color:var(--ink-3);
+  text-transform:uppercase;margin-bottom:3px}
+.pop-ctx .live{color:var(--jade)} .pop-ctx .dead{color:var(--rose)}
+
+/* KPI strip: one continuous rule of figures, not six cards */
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
+  border:1px solid var(--rule);border-top:0;border-radius:0 0 var(--r) var(--r);
+  background:var(--slate);margin-bottom:26px}
+.kpi > div{padding:15px 18px;border-right:1px solid var(--rule)}
+.kpi > div:last-child{border-right:0}
+.kpi b{display:block;font:600 26px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--ink);letter-spacing:-.01em}
+.kpi span{display:block;font:500 8.5px/1 var(--mono);letter-spacing:.18em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:8px}
+.kpi .u{font-size:14px;color:var(--ink-3);margin-left:3px}
+.kpi .air b{color:var(--jade)} .kpi .on b{color:var(--blue)}
+.kpi .cmd b{color:var(--amber)}
+
+/* two-column band: flight line beside readiness */
+.pband{display:grid;grid-template-columns:1fr 400px;gap:22px;margin-bottom:26px;
+  align-items:start}
+@media(max-width:1280px){.pband{grid-template-columns:1fr}}
+
+/* ---------- active flight line ---------- */
+.fl{border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.flrow{display:grid;grid-template-columns:auto 1fr repeat(3,minmax(96px,auto)) auto;
+  gap:0 18px;align-items:center;padding:13px 16px;
+  border-bottom:1px solid var(--rule);cursor:pointer;transition:background .16s ease}
+.flrow:last-child{border-bottom:0}
+.flrow:hover{background:rgba(76,143,232,.055)}
+.flrow .f{min-width:0}
+.flrow .fk{display:block;font:500 8.5px/1 var(--mono);letter-spacing:.17em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:5px}
+.flrow .fv{display:block;font:500 12.5px/1.2 var(--mono);color:var(--ink);
+  font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.flrow .cname{font:600 15px/1.2 var(--ui);color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flrow .crole{font:500 9.5px/1 var(--mono);letter-spacing:.13em;color:var(--ink-3);
+  margin-top:5px;text-transform:uppercase}
+
+/* ---------- readiness ---------- */
+.rd{border:1px solid var(--rule);border-radius:var(--r);padding:16px 18px}
+.rdbar{display:flex;height:10px;border-radius:2px;overflow:hidden;
+  background:var(--graphite);border:1px solid var(--rule);margin:4px 0 14px}
+.rdbar i{transition:width .3s ease}
+.rdbar i.air{background:var(--jade)}
+.rdbar i.pit{background:var(--blue)}
+.rdbar i.onl{background:var(--blue-dim)}
+.rdbar i.stb{background:repeating-linear-gradient(135deg,var(--rule-2) 0 5px,var(--rule) 5px 10px)}
+.rdkey{display:grid;gap:0}
+.rdkey div{display:flex;align-items:center;gap:9px;padding:6px 0;
+  border-bottom:1px solid rgba(255,255,255,.035)}
+.rdkey div:last-child{border-bottom:0}
+.rdkey i{width:8px;height:8px;border-radius:2px;flex:none}
+.rdkey .l{font:400 11.5px/1 var(--ui);color:var(--ink-2)}
+.rdkey .d{font:400 10px/1 var(--mono);color:var(--ink-3);margin-left:auto;
+  margin-right:10px}
+.rdkey .n{font:500 12px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--ink);min-width:22px;text-align:right}
+
+/* ---------- roster controls ---------- */
+.rct{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.psearch{position:relative;flex:1;min-width:210px;max-width:340px}
+.psearch input{width:100%;background:var(--slate);border:1px solid var(--rule-2);
+  border-radius:var(--r);padding:8px 11px 8px 30px;color:var(--ink);
+  font:400 12px/1.3 var(--mono);letter-spacing:.04em}
+.psearch input::placeholder{color:var(--ink-3);letter-spacing:.13em;font-size:10.5px}
+.psearch input:focus{outline:none;border-color:var(--blue)}
+.psearch svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);
+  width:13px;height:13px;stroke:var(--ink-3);fill:none;stroke-width:1.6}
+.pfilt{display:flex;gap:5px;flex-wrap:wrap}
+.pfilt button{font:500 9.5px/1 var(--mono);letter-spacing:.13em;padding:7px 10px;
+  border:1px solid var(--rule-2);border-radius:var(--r);color:var(--ink-3);
+  transition:all .16s ease}
+.pfilt button:hover{color:var(--ink-2);border-color:var(--rule-hot)}
+.pfilt button.on{color:var(--ink);border-color:var(--blue);background:rgba(76,143,232,.11)}
+.rct .count{margin-left:auto;font:400 10.5px/1 var(--mono);color:var(--ink-3)}
+
+/* ---------- roster ---------- */
+/* Numeric columns are sized, not stretched: grouped on the right they can be
+   compared by running the eye down, which is the whole point of a roster. */
+.pops table.lb th.n,.pops table.lb td.n{width:104px}
+.pops table.lb th.w,.pops table.lb td.w{width:132px}
+.pops table.lb td.r,.pops table.lb th.r{padding-right:14px}
+
+table.lb thead th.s{cursor:pointer;user-select:none}
+table.lb thead th.s:hover{color:var(--ink-2)}
+table.lb thead th .ar{opacity:0;margin-left:4px}
+table.lb thead th.act{color:var(--ink)}
+table.lb thead th.act .ar{opacity:1;color:var(--blue)}
+table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
+  box-shadow:inset 2px 0 0 var(--blue)}
+
+/* status pip: the one place a pulse is allowed, and only when airborne */
+.st{display:inline-flex;align-items:center;gap:7px;font:500 9.5px/1 var(--mono);
+  letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+.st i{width:6px;height:6px;border-radius:50%;flex:none;background:var(--ink-3)}
+.st.airborne{color:var(--jade)} .st.airborne i{background:var(--jade);
+  animation:beat 2.4s ease-out infinite}
+.st.cockpit{color:var(--blue)} .st.cockpit i{background:var(--blue)}
+.st.online{color:var(--blue)} .st.online i{background:var(--blue-dim)}
+.st.standby{color:var(--ink-3)} .st.standby i{background:var(--rule-2)}
+
+/* avatar with a status ring: operational identifier, not a profile photo */
+.pav{position:relative}
+.pav.ring::after{content:'';position:absolute;inset:-3px;border-radius:5px;
+  border:1px solid var(--ringc,transparent);pointer-events:none}
+
+/* ---------- intelligence drawer ---------- */
+#pdrawer{position:fixed;top:var(--hdrh);right:0;bottom:0;width:410px;z-index:900;
+  background:var(--slate);border-left:1px solid var(--rule-2);
+  box-shadow:-18px 0 48px rgba(0,0,0,.5);
+  transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);
+  overflow-y:auto;display:flex;flex-direction:column}
+#pdrawer.open{transform:translateX(0)}
+@media(max-width:640px){#pdrawer{width:100%}}
+
+.dw-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;
+  justify-content:space-between;padding:11px 16px;background:var(--slate);
+  border-bottom:1px solid var(--rule)}
+.dw-top .eyebrow{color:var(--ink-2)}
+.dw-x{width:26px;height:26px;display:grid;place-items:center;border-radius:var(--r);
+  color:var(--ink-3);font-size:15px;line-height:1;transition:all .16s ease}
+.dw-x:hover{color:var(--ink);background:var(--raised)}
+
+.dw-id{display:flex;gap:14px;padding:18px 16px;border-bottom:1px solid var(--rule)}
+.dw-id .av{width:52px;height:52px;border-radius:4px;flex:none;display:grid;
+  place-items:center;font:600 18px/1 var(--mono);
+  background:var(--avb);color:var(--avf);border:1px solid var(--avf)}
+.dw-id .nm{font:600 19px/1.15 var(--ui);color:var(--ink);word-break:break-word}
+.dw-id .rl{margin-top:7px}
+.dw-id .stline{margin-top:9px}
+
+.dw-sec{padding:14px 16px;border-bottom:1px solid var(--rule)}
+.dw-sec h4{margin:0 0 10px;font:500 9px/1 var(--mono);letter-spacing:.2em;
+  text-transform:uppercase;color:var(--ink-3)}
+.dw-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);
+  border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.dw-grid div{background:var(--slate);padding:11px 13px}
+/* Odd tile counts left an empty cell; let the last one span the row. */
+.dw-grid div:last-child:nth-child(odd){grid-column:span 2}
+.dw-grid b{display:block;font:600 17px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--ink)}
+.dw-grid span{display:block;font:500 8.5px/1 var(--mono);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:6px}
+
+.dw-kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;
+  border-bottom:1px solid rgba(255,255,255,.035);font:400 12px/1.45 var(--ui)}
+.dw-kv:last-child{border-bottom:0}
+.dw-kv .k{color:var(--ink-3)}
+.dw-kv .v{font:500 11.5px/1.45 var(--mono);color:var(--ink-2);text-align:right;
+  font-variant-numeric:tabular-nums}
+
+/* per-pilot activity: a timeline, so it reads as a sequence */
+.dw-tl{position:relative;padding-left:15px}
+.dw-tl::before{content:'';position:absolute;left:3px;top:5px;bottom:5px;width:1px;
+  background:var(--rule-2)}
+.dw-tl .ev{position:relative;padding:0 0 12px 0}
+.dw-tl .ev:last-child{padding-bottom:0}
+.dw-tl .ev::before{content:'';position:absolute;left:-15px;top:4px;width:7px;height:7px;
+  border-radius:50%;background:var(--rule-2);border:2px solid var(--slate)}
+.dw-tl .ev.kill::before{background:var(--rose)}
+.dw-tl .ev.capture::before{background:var(--blue)}
+.dw-tl .ev.trap::before{background:var(--amber)}
+.dw-tl .ev.join::before,.dw-tl .ev.leave::before{background:var(--jade)}
+.dw-tl .t{font:400 10px/1 var(--mono);color:var(--ink-3)}
+.dw-tl .x{font:400 12px/1.45 var(--ui);color:var(--ink-2);margin-top:3px}
+
+.dw-empty{font:400 11.5px/1.6 var(--ui);color:var(--ink-3);font-style:italic}
+
+/* backdrop so the drawer reads as modal-ish without trapping the roster */
+#pscrim{position:fixed;inset:0;z-index:880;background:rgba(6,9,13,.5);
+  opacity:0;pointer-events:none;transition:opacity .22s ease}
+#pscrim.on{opacity:1;pointer-events:auto}
+@media(min-width:1100px){#pscrim{display:none}}
+
+/* ---------- section rules on this page ---------- */
+.pops .srule{margin:0 0 12px}
+
+@media(max-width:820px){
+  .pops{padding:16px 14px 70px}
+  .kpi{grid-template-columns:repeat(auto-fit,minmax(104px,1fr))}
+  .kpi > div{padding:12px 13px}
+  .kpi b{font-size:20px}
+  .flrow{grid-template-columns:auto 1fr;gap:10px}
+  .flrow .f{grid-column:2}
+  .pop-ctx{width:100%}
+}
+
 </style>
 </head>
 <body>
@@ -684,6 +894,9 @@ td.detcell{padding:0!important;background:rgba(10,14,20,.6);
     <span id="upd"></span>
   </div>
 </header>
+
+<div id="pscrim" hidden></div>
+<aside id="pdrawer" aria-hidden="true" aria-label="Pilot intelligence"></aside>
 
 <div id="main">
   <div id="list"><div class="boot">
@@ -1357,187 +1570,442 @@ function pilotRows(){
   }).sort((a,b)=>b.xp-a.xp);
 }
 
-// Only tiles backed by real data are emitted. Pretense records XP, a 'cmd'
-// counter and a survival bonus -- it does not record kills or deaths, so there
-// are no such tiles until something actually produces those numbers.
-// Squadron-wide aggregates. Every figure is summed from data that exists --
-// nothing is shown that would be zero purely because the source is missing.
-function squadronTotals(rows){
-  const sum = (f) => rows.reduce((a,r)=>a + (f(r)||0), 0);
-  const sorties = sum(r=>r.cb&&r.cb.sorties);
-  const kills   = sum(r=>r.kd&&r.kd.kills);
-  const losses  = sum(r=>r.cb&&r.cb.deaths);
-  const mins    = sum(r=>{ const sn=(D.seen||{})[r.name]; return sn&&sn.minutes; });
-  const c = D.campaign, zs = Object.values((c&&c.zones)||{});
-  const blue = zs.filter(z=>z.side===2).length;
 
-  const t=[];
-  if(mins)    t.push(`<div><b>${flown(mins)}</b><span>Flown</span></div>`);
-  if(sorties) t.push(`<div><b>${sorties}</b><span>Sorties</span></div>`);
-  if(kills)   t.push(`<div><b>${kills}</b><span>Kills</span></div>`);
-  if(losses)  t.push(`<div><b>${losses}</b><span>Losses</span></div>`);
-  if(zs.length) t.push(`<div><b>${blue}/${zs.length}</b><span>Zones held</span></div>`);
-  return t.length ? `<div class="tot2">${t.join('')}</div>` : '';
+
+// ===================== PILOT OPERATIONS =====================
+
+// View state. Kept outside the render so a poll never resets what the
+// operator has typed or chosen.
+let pQuery='', pFilter='all', pSort='status', pDesc=true, pSel=null, pShell=false;
+
+// Status is derived, never stored. Order matters: the first match wins, and
+// they run most-operational first.
+//
+//   airborne  a player unit exists in the gRPC feed above 150 m
+//   cockpit   occupying an aircraft slot but not up yet
+//   online    connected without a slot -- slotting or spectating
+//   standby   has flown here before, not connected now
+function pilotStatus(r){
+  if(r.airborne) return 'airborne';
+  if(r.on && r.unit) return 'cockpit';
+  if(r.on) return 'online';
+  return 'standby';
 }
+const ST_LABEL={airborne:'Airborne',cockpit:'In cockpit',online:'Online',standby:'Standby'};
+const ST_ORDER={airborne:0,cockpit:1,online:2,standby:3};
 
-function pilotCard(r, pos, count, total, leader){
-  const av=avatar(r.name);
-  const share=total?Math.round(r.xp/total*100):0;
-  const gap=leader-r.xp;
-
-  const seen=(D.seen||{})[r.name]||null;
-  const pills=[];
-  if(r.unit) pills.push(`<span class="pill2">${esc(r.unit)}</span>`);
-  if(r.on) pills.push(`<span class="pill2 ${r.side===1?'r':'b'}">${
-    r.side===1?'RED':r.side===2?'BLUE':'SPECTATOR'}</span>`);
-  if(r.role) pills.push(`<span class="badge role">${esc(r.role.tag)}</span>`);
-
-  const notes=[];
-  if(r.role) notes.push(esc(r.role.title));
-
-  notes.push(r.on
-    ? (r.unit?`Airborne now in a <b>${esc(r.unit)}</b>.`:'Connected now.')
-    : (seen&&seen.last
-        ? `Not connected — last seen <b>${ago(Date.now()/1000-seen.last)} ago</b>.`
-        : 'Not connected.'));
-  notes.push(`Holds <b>${share}%</b> of the squadron's total XP` +
-    (gap>0?`, <b>${gap.toLocaleString()}</b> behind the leader.`:' — currently top of the board.'));
-
-  if(r.cb){
-    const cw=r.cb;
-    // Sorties with no weapons released means transport or recce, which is a
-    // role worth naming rather than showing as a row of zeroes.
-    if(cw.sorties && !cw.shots && !cw.hits){
-      notes.push('Flies <b>support</b> — sorties logged, no weapons released.');
-    } else if(cw.shots || cw.hits){
-      notes.push(`<b>${(cw.shots||0).toLocaleString()}</b> weapons released, ` +
-        `<b>${(cw.hits||0).toLocaleString()}</b> ` +
-        `<span title="One hit is logged per impact, so a cannon burst counts many. This is activity, not accuracy.">impacts</span>.`);
-    }
-    if(cw.ejects) notes.push(`Ejected <b>${cw.ejects}</b> time(s).`);
-  }
-  // Only OVERLORD has scope settings, so this line appears for exactly one person.
-  if(r.cfg && r.cfg.gci_warning_radius!==undefined){
-    notes.push(`GCI scope set to a <b>${r.cfg.gci_warning_radius}</b> ` +
-      `${r.cfg.gci_metric?'km':'nm'} warning radius.`);
-  }
-
-  // A third-width card fits four tiles before the labels wrap, and there can
-  // be eight candidates. Rank moved to the corner badge; the rest are offered
-  // in the order a pilot would care about them and the list is then capped.
-  //
-  // Combat numbers come from the DCS log via pilot-stats.ps1. There is
-  // deliberately no Kills tile: DCS emits no kill event at all, and inferring
-  // one from hit-then-death misattributes assists and splash damage.
-  const cb=r.cb;
-  const TILE_CAP=4;
-  // Kills come from gRPC's KillEvent -- a recorded kill, not the hit-then-death
-  // guess I refused to ship off the DCS log, which has no kill event at all.
-  const kd = r.kd;
-  const ratio = (kd && kd.deaths) ? (kd.kills / kd.deaths).toFixed(2)
-              : (kd ? String(kd.kills || 0) : null);
-
-  const candidates=[
-    [true,               r.xp.toLocaleString(),        'XP'],
-    [!!(kd&&kd.kills),   kd&&kd.kills,                 'Kills'],
-    [!!(kd&&(kd.kills||kd.deaths)), ratio,             'K/D'],
-    [!!(kd&&kd.traps),   kd&&kd.traps,                 'Traps'],
-    [!!cb,               cb&&(cb.sorties||0),          'Sorties'],
-    [!!cb,               cb&&(cb.deaths||0),           'Losses'],
-    [!!(seen&&seen.minutes>=1), seen&&flown(seen.minutes), 'Flown'],
-    [!!cb,               cb&&(cb.landings||0),         'Landings'],
-    [!!(seen&&seen.sessions), seen&&seen.sessions,     'Sessions'],
-    [!!r.sb,             r.sb,                         'Survival'],
-    [!!r.cmd,            r.cmd,                        'Commands'],
-    [!cb,                share+'%',                    'Share'],
-  ];
-  const tiles=candidates.filter(c=>c[0]).slice(0,TILE_CAP)
-    .map(c=>`<div><b>${c[1]}</b><span>${c[2]}</span></div>`);
-
-  return `<div class="pcard${pos<=3?' p'+pos:''}" style="--avb:${av.bg};--avf:${av.fg}">
-    <div class="prank">#${pos}</div>
-    <div class="phead">
-      <div class="pav">${esc(av.initials)}</div>
-      <div>
-        <div class="pname">${esc(r.name)}${
-          r.on?' <span class="badge on">FLYING</span>':''}</div>
-        <div class="ppills">${pills.join('')}</div>
-        <div class="pnote">${notes.join('<br>')}</div>
-      </div>
-    </div>
-    <div class="pstats">${tiles.join('')}</div>
-  </div>`;
-}
-
-function renderPilots(){
+// Everything the page knows about one pilot, assembled from the five feeds.
+function pilotRecords(){
   const rows=pilotRows();
-  if(!rows.length){ $('#panel').innerHTML=
-    `<div class="pnl"><h2>Squadron roster</h2>
-     <div class="empty"><b>No roster yet</b>Pretense writes pilot records the first
-     time someone flies. Nothing has been logged on this campaign.</div></div>`;
-    return; }
-  const tot=rows.reduce((a,r)=>a+r.xp,0);
+  // live.json carries player units with an altitude; that is the only honest
+  // way to tell airborne from sitting on the ramp.
+  const air={};
+  ((D.live&&D.live.world&&D.live.world.units)||[]).forEach(u=>{
+    if(u.p) air[u.p]={alt:u.alt||0};
+  });
+  return rows.map(r=>{
+    const sn=(D.seen||{})[r.name]||null;
+    const a=air[r.name];
+    const rec=Object.assign({},r,{
+      seen:sn,
+      airborne:!!(a && (a.alt||0)>150),
+      alt:a?a.alt:null,
+      minutes:sn?sn.minutes:0,
+      sessions:sn?sn.sessions:0,
+      last:sn?sn.last:0,
+      first:sn?sn.first:0,
+    });
+    rec.status=pilotStatus(rec);
+    return rec;
+  });
+}
 
-  const th=(t,cls='')=>`<th class="${cls}">${t}</th>`;
+function pilotCounts(recs){
+  const c={airborne:0,cockpit:0,online:0,standby:0,command:0};
+  recs.forEach(r=>{ c[r.status]++; if(r.role||r.cmd) c.command++; });
+  c.connected=c.airborne+c.cockpit+c.online;
+  c.total=recs.length;
+  return c;
+}
 
-  $('#panel').innerHTML=`<div class="pnl wide">
-    <h2>Squadron roster</h2>
-    <div class="sub">${rows.length} pilots &middot; <b>${tot.toLocaleString()} XP</b> on this
-      campaign. XP carries across sessions and survives a restart.
-      Select a callsign for the full record.</div>
-    ${squadronTotals(rows)}
-    ${rows.filter(r=>r.role).map(r=>`<div class="roles">
-       <b>${esc(r.role.tag)}</b>${esc(r.name)} &middot; ${esc(r.role.title)}</div>`).join('')}
+function setPilotView(o){
+  if(o.q      !== undefined) pQuery  = o.q;
+  if(o.filter !== undefined) pFilter = o.filter;
+  if(o.desc   !== undefined) pDesc   = o.desc;
+  if(o.sort   !== undefined){
+    // Clicking the active column flips direction; a new column starts descending.
+    if(pSort === o.sort && o.desc === undefined) pDesc = !pDesc;
+    else if(pSort !== o.sort) pDesc = true;
+    pSort = o.sort;
+  }
+  renderPilotRoster(pilotRecords());
+}
 
-    <div class="srule"><span>Roster</span><i></i></div>
+function filterPilots(recs){
+  const q=pQuery.trim().toLowerCase();
+  return recs.filter(r=>{
+    if(pFilter==='connected' && r.status==='standby') return false;
+    if(pFilter==='airborne'  && r.status!=='airborne') return false;
+    if(pFilter==='command'   && !(r.role||r.cmd)) return false;
+    if(!q) return true;
+    // Search covers the things an operator would actually type.
+    return r.name.toLowerCase().includes(q)
+        || (r.role && (r.role.tag+' '+r.role.title).toLowerCase().includes(q))
+        || (r.unit && r.unit.toLowerCase().includes(q))
+        || ST_LABEL[r.status].toLowerCase().includes(q);
+  });
+}
+
+function sortPilots(recs){
+  const dir=pDesc?-1:1;
+  const num=(v)=>typeof v==='number'&&isFinite(v)?v:-1;
+  const by={
+    // Default. Operationally useful: who is up, then who has earned most.
+    status:(a,b)=>(ST_ORDER[a.status]-ST_ORDER[b.status]) || (b.xp-a.xp),
+    name:  (a,b)=>a.name.localeCompare(b.name)*-dir,
+    xp:    (a,b)=>(num(a.xp)-num(b.xp))*dir,
+    sorties:(a,b)=>(num(a.cb&&a.cb.sorties)-num(b.cb&&b.cb.sorties))*dir,
+    kills: (a,b)=>(num(a.kd&&a.kd.kills)-num(b.kd&&b.kd.kills))*dir,
+    flown: (a,b)=>(num(a.minutes)-num(b.minutes))*dir,
+    last:  (a,b)=>(num(a.last)-num(b.last))*dir,
+  };
+  return recs.slice().sort(by[pSort]||by.status);
+}
+
+// --- pieces -----------------------------------------------------------------
+
+function stPip(r){
+  return `<span class="st ${r.status}"><i></i>${ST_LABEL[r.status]}</span>`;
+}
+
+function pAvatar(r,cls){
+  const av=avatar(r.name);
+  const ring={airborne:'var(--jade)',cockpit:'var(--blue)',online:'var(--blue-dim)'}[r.status];
+  return `<span class="pav ${cls||''} ${ring?'ring':''}"
+    style="--avb:${av.bg};--avf:${av.fg}${ring?`;--ringc:${ring}`:''}">${esc(av.initials)}</span>`;
+}
+
+function renderPilotsKpi(recs,c){
+  const sorties=recs.reduce((a,r)=>a+((r.cb&&r.cb.sorties)||0),0);
+  const mins=recs.reduce((a,r)=>a+(r.minutes||0),0);
+  const kills=recs.reduce((a,r)=>a+((r.kd&&r.kd.kills)||0),0);
+  const cell=(cls,v,u,l)=>`<div class="${cls}"><b>${v}${u?`<span class="u">${u}</span>`:''}</b>
+    <span>${l}</span></div>`;
+  $('#pKpi').innerHTML=
+    cell('','',0,'') === '' ? '' : [
+      cell('',c.total,'','On roster'),
+      cell('on',c.connected,'','Connected'),
+      cell('air',c.airborne,'','Airborne'),
+      cell('',sorties,'','Sorties'),
+      cell('',flown(mins),'','Flight time'),
+      kills?cell('',kills,'','Kills'):'',
+      cell('cmd',c.command,'','Command'),
+    ].join('');
+}
+
+function renderReadiness(recs,c){
+  const seg=(k,n)=>n?`<i class="${k}" style="width:${(n/Math.max(c.total,1))*100}%"></i>`:'';
+  const key=(cls,col,label,note,n)=>`<div><i style="background:${col}"></i>
+    <span class="l">${label}</span><span class="d">${note}</span>
+    <span class="n">${n}</span></div>`;
+  $('#pReady').innerHTML=`
+    <h4 class="eyebrow" style="margin:0 0 10px">Squadron readiness</h4>
+    <div class="rdbar">
+      ${seg('air',c.airborne)}${seg('pit',c.cockpit)}${seg('onl',c.online)}${seg('stb',c.standby)}
+    </div>
+    <div class="rdkey">
+      ${key('air','var(--jade)','Airborne','in the air',c.airborne)}
+      ${key('pit','var(--blue)','In cockpit','slotted',c.cockpit)}
+      ${key('onl','var(--blue-dim)','Online','no slot',c.online)}
+      ${key('stb','var(--rule-2)','Standby','not connected',c.standby)}
+    </div>`;
+}
+
+function renderActiveFlightLine(recs){
+  const live=recs.filter(r=>r.status!=='standby')
+                 .sort((a,b)=>ST_ORDER[a.status]-ST_ORDER[b.status]);
+  const el=$('#pFlight');
+  if(!live.length){
+    // The honest empty state: say what would appear, and what is true now.
+    const st=D.status, on=st&&st.online&&(Date.now()/1000-st.ts)<STALE;
+    el.innerHTML=`<div class="empty"><b>No pilots connected</b>
+      ${on?'The server is up and the field is clear. Pilots appear here the moment they join.'
+          :'The server is offline. Start it from Discord with <b>/dcs start</b>.'}</div>`;
+    return;
+  }
+  const f=(k,v)=>`<div class="f"><span class="fk">${k}</span><span class="fv">${v}</span></div>`;
+  el.innerHTML=live.map(r=>`
+    <div class="flrow" data-n="${esc(r.name)}" tabindex="0" role="button"
+         aria-label="Open record for ${esc(r.name)}">
+      ${pAvatar(r,'')}
+      <div style="min-width:0">
+        <div class="cname">${esc(r.name)}</div>
+        <div class="crole">${r.role?esc(r.role.tag):(r.side===1?'Red':r.side===2?'Blue':'Unassigned')}</div>
+      </div>
+      ${f('Status', ST_LABEL[r.status])}
+      ${f('Aircraft', r.unit?esc(r.unit):'&mdash;')}
+      ${f('Altitude', r.airborne?`${Math.round(r.alt).toLocaleString()} m`:'&mdash;')}
+      ${stPip(r)}
+    </div>`).join('');
+}
+
+function renderPilotRoster(recs){
+  const view=sortPilots(filterPilots(recs));
+  $('#pCount').textContent=`${view.length} of ${recs.length}`;
+
+  if(!view.length){
+    $('#pRoster').innerHTML=`<div class="empty"><b>No matching pilots</b>
+      Nothing matches ${pQuery?`&ldquo;${esc(pQuery)}&rdquo;`:'this filter'}. Clear it to see the full roster.</div>`;
+    return;
+  }
+
+  const th=(key,label,cls='')=>{
+    const act=pSort===key;
+    return `<th class="s ${cls} ${act?'act':''}" data-s="${key}" tabindex="0" role="button"
+      aria-sort="${act?(pDesc?'descending':'ascending'):'none'}">${label}<span class="ar">${
+      act?(pDesc?'\u25be':'\u25b4'):'\u25be'}</span></th>`;
+  };
+
+  $('#pRoster').innerHTML=`
     <table class="lb"><thead><tr>
-      ${th('')}${th('Callsign')}${th('Status','hide-s')}
-      ${th('Sorties','r hide-s')}${th('Kills','r')}${th('Losses','r hide-s')}
-      ${th('Flown','r hide-s')}${th('XP','r')}
+      <th style="width:46px"></th>
+      ${th('name','Pilot')}
+      ${th('status','Status','hide-s')}
+      <th class="hide-s">Aircraft</th>
+      ${th('sorties','Sorties','r n hide-s')}
+      ${th('kills','Kills','r n')}
+      ${th('flown','Flight time','r w hide-s')}
+      ${th('last','Last active','r n hide-s')}
+      ${th('xp','XP','r n')}
     </tr></thead><tbody>
-    ${rows.map((r,i)=>{
-      const av=avatar(r.name), sn=(D.seen||{})[r.name];
-      const kd=r.kd, cb=r.cb;
-      return `<tr class="pr" data-p="${i}" tabindex="0" role="button"
-                  aria-expanded="false" aria-label="Record for ${esc(r.name)}">
-        <td class="pos"><span class="caret">&#9656;</span> ${i+1}</td>
-        <td><div class="cs">
-          <span class="pav" style="--avb:${av.bg};--avf:${av.fg}">${esc(av.initials)}</span>
+    ${view.map((r,i)=>`
+      <tr class="pr ${pSel===r.name?'sel':''}" data-n="${esc(r.name)}" tabindex="0"
+          role="button" aria-label="Open record for ${esc(r.name)}">
+        <td class="pos">${i+1}</td>
+        <td><div class="cs">${pAvatar(r,'')}
           <span class="nmw">${esc(r.name)}</span>
           ${r.role?`<span class="badge role">${esc(r.role.tag)}</span>`:''}
+          ${!r.role&&r.cmd?`<span class="badge cmd">CMD</span>`:''}
         </div></td>
-        <td class="hide-s">${r.on
-          ? `<span class="badge on">FLYING</span>${r.unit?` <span class="pill2">${esc(r.unit)}</span>`:''}`
-          : `<span style="color:var(--ink-3);font:400 11px var(--mono)">${
-              sn&&sn.last?ago(Date.now()/1000-sn.last)+' ago':'--'}</span>`}</td>
-        <td class="r hide-s">${cb?cb.sorties||0:'--'}</td>
-        <td class="r">${kd&&kd.kills?kd.kills:'--'}</td>
-        <td class="r hide-s">${cb?cb.deaths||0:'--'}</td>
-        <td class="r hide-s">${sn&&sn.minutes>=1?flown(sn.minutes):'--'}</td>
-        <td class="r" style="color:var(--ink)">${r.xp.toLocaleString()}</td>
-      </tr>
-      <tr class="det" data-d="${i}" style="display:none">
-        <td class="detcell" colspan="8">${pilotCard(r,i+1,rows.length,tot,rows[0].xp)}</td>
-      </tr>`;
-    }).join('')}
-    </tbody></table></div>`;
+        <td class="hide-s">${stPip(r)}</td>
+        <td class="hide-s">${r.unit?`<span class="pill2">${esc(r.unit)}</span>`
+          :'<span style="color:var(--ink-3)">&mdash;</span>'}</td>
+        <td class="r n hide-s">${r.cb?(r.cb.sorties||0):'&mdash;'}</td>
+        <td class="r n">${r.kd&&r.kd.kills?r.kd.kills:'&mdash;'}</td>
+        <td class="r w hide-s">${r.minutes>=1?flown(r.minutes):'&mdash;'}</td>
+        <td class="r n hide-s">${r.last?ago(Date.now()/1000-r.last):'&mdash;'}</td>
+        <td class="r n" style="color:var(--ink)">${r.xp.toLocaleString()}</td>
+      </tr>`).join('')}
+    </tbody></table>`;
 
-  // Accordion. Keyboard reachable, because a roster you cannot tab through is
-  // not a roster.
-  const open=(tr)=>{
-    const i=tr.dataset.p;
-    const det=$('#panel').querySelector(`tr.det[data-d="${i}"]`);
-    const isOpen=det.style.display!=='none';
-    $('#panel').querySelectorAll('tr.det').forEach(d=>d.style.display='none');
-    $('#panel').querySelectorAll('tr.pr').forEach(p=>{
-      p.classList.remove('open'); p.setAttribute('aria-expanded','false'); });
-    if(!isOpen){ det.style.display=''; tr.classList.add('open');
-                 tr.setAttribute('aria-expanded','true'); }
-  };
-  $('#panel').querySelectorAll('tr.pr').forEach(tr=>{
-    tr.onclick=()=>open(tr);
-    tr.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(tr); } };
+  $('#pRoster').querySelectorAll('th.s').forEach(h=>{
+    const go=()=>setPilotView({sort:h.dataset.s});
+    h.onclick=go;
+    h.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } };
   });
+  bindPilotOpen($('#pRoster'));
+}
+
+function bindPilotOpen(root){
+  root.querySelectorAll('[data-n]').forEach(node=>{
+    const go=()=>openPilot(node.dataset.n);
+    node.onclick=go;
+    node.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } };
+  });
+}
+
+// --- intelligence drawer -----------------------------------------------------
+
+function pilotActivity(name){
+  // The event feed stores rendered sentences, so a pilot's history is the
+  // subset that names them. Crude, but it is real data rather than invented.
+  const n=name.toLowerCase();
+  return ((D.feed&&D.feed.feed)||[]).filter(e=>String(e.t||'').toLowerCase().includes(n));
+}
+
+function renderPilotDetail(name){
+  const recs=pilotRecords();
+  const r=recs.find(x=>x.name===name);
+  const dw=$('#pdrawer');
+  if(!r){ dw.innerHTML=''; return; }
+
+  const av=avatar(r.name);
+  const rank=recs.slice().sort((a,b)=>b.xp-a.xp).findIndex(x=>x.name===name)+1;
+  const cb=r.cb, kd=r.kd;
+
+  const tile=(v,l)=>`<div><b>${v}</b><span>${l}</span></div>`;
+  const kv=(k,v)=>`<div class="dw-kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+
+  // Only tiles with a real number behind them.
+  const tiles=[tile(r.xp.toLocaleString(),'XP'), tile('#'+rank,'Standing')];
+  if(cb) tiles.push(tile(cb.sorties||0,'Sorties'), tile(cb.deaths||0,'Losses'));
+  if(kd&&kd.kills) tiles.push(tile(kd.kills,'Kills'));
+  if(kd&&kd.traps) tiles.push(tile(kd.traps,'Traps'));
+  if(r.minutes>=1) tiles.push(tile(flown(r.minutes),'Flight time'));
+  if(r.sessions) tiles.push(tile(r.sessions,'Sessions'));
+
+  const facts=[];
+  if(r.unit) facts.push(kv('Aircraft',esc(r.unit)));
+  if(r.airborne) facts.push(kv('Altitude',Math.round(r.alt).toLocaleString()+' m'));
+  if(r.on) facts.push(kv('Coalition',r.side===1?'Red':r.side===2?'Blue':'Unassigned'));
+  if(cb&&cb.sorties) facts.push(kv('Returned',`${cb.landings||0} of ${cb.sorties} sorties`));
+  if(cb&&(cb.shots||cb.hits)) facts.push(kv('Weapons',
+    `${(cb.shots||0).toLocaleString()} released \u00b7 ${(cb.hits||0).toLocaleString()} impacts`));
+  if(cb&&cb.ejects) facts.push(kv('Ejections',cb.ejects));
+  if(r.sb) facts.push(kv('Survival bonus',r.sb));
+  if(r.cmd) facts.push(kv('Command actions',r.cmd));
+  if(r.first) facts.push(kv('First seen',new Date(r.first*1000).toLocaleDateString()));
+  if(r.last&&!r.on) facts.push(kv('Last seen',ago(Date.now()/1000-r.last)+' ago'));
+  if(r.cfg&&r.cfg.gci_warning_radius!==undefined)
+    facts.push(kv('GCI warning radius',`${r.cfg.gci_warning_radius} ${r.cfg.gci_metric?'km':'nm'}`));
+
+  const acts=pilotActivity(name);
+
+  dw.innerHTML=`
+    <div class="dw-top">
+      <span class="eyebrow">Pilot intelligence</span>
+      <button class="dw-x" id="pdClose" aria-label="Close">&times;</button>
+    </div>
+
+    <div class="dw-id">
+      <span class="av" style="--avb:${av.bg};--avf:${av.fg}">${esc(av.initials)}</span>
+      <div style="min-width:0">
+        <div class="nm">${esc(r.name)}</div>
+        ${r.role?`<div class="rl"><span class="badge role">${esc(r.role.tag)}</span></div>
+                  <div class="pnote" style="margin-top:7px">${esc(r.role.title)}</div>`:''}
+        <div class="stline">${stPip(r)}</div>
+      </div>
+    </div>
+
+    <div class="dw-sec">
+      <h4>Record</h4>
+      <div class="dw-grid">${tiles.join('')}</div>
+    </div>
+
+    ${facts.length?`<div class="dw-sec"><h4>Detail</h4>${facts.join('')}</div>`:''}
+
+    <div class="dw-sec">
+      <h4>Activity</h4>
+      ${acts.length
+        ? `<div class="dw-tl">${acts.slice(0,14).map(e=>`
+            <div class="ev ${esc(e.k)}">
+              <div class="t">${ago(Date.now()/1000-e.ts)} ago &middot; ${esc(String(e.k).toUpperCase())}</div>
+              <div class="x">${esc(e.t)}</div>
+            </div>`).join('')}</div>`
+        : `<div class="dw-empty">No events recorded for this pilot. Kills, captures,
+           traps and connections are logged live while the server runs.</div>`}
+    </div>`;
+
+  $('#pdClose').onclick=closePilot;
+}
+
+function openPilot(name){
+  pSel=name;
+  $('#panel').classList.add('drawered');
+  renderPilotDetail(name);
+  $('#pdrawer').classList.add('open');
+  $('#pdrawer').setAttribute('aria-hidden','false');
+  $('#pscrim').classList.add('on');
+  $('#pscrim').hidden=false;
+  $('#pRoster').querySelectorAll('tr.pr').forEach(t=>
+    t.classList.toggle('sel', t.dataset.n===name));
+}
+
+function closePilot(){
+  pSel=null;
+  $('#panel').classList.remove('drawered');
+  $('#pdrawer').classList.remove('open');
+  $('#pdrawer').setAttribute('aria-hidden','true');
+  $('#pscrim').classList.remove('on');
+  $('#pscrim').hidden=true;
+  $('#pRoster').querySelectorAll('tr.pr.sel').forEach(t=>t.classList.remove('sel'));
+}
+
+// --- entry point -------------------------------------------------------------
+
+function renderPilots(){
+  const recs=pilotRecords();
+
+  if(!recs.length){
+    pShell=false;
+    $('#panel').innerHTML=`<div class="pops"><div class="pop-head"><div>
+      <h2>Pilot operations</h2>
+      <div class="sub">Squadron personnel and flight status.</div></div></div>
+      <div class="empty" style="margin-top:20px"><b>No roster yet</b>
+      Pretense writes pilot records the first time someone flies. Nothing has been
+      logged on this campaign.</div></div>`;
+    return;
+  }
+
+  // Build the frame once. Rebuilding it every poll would clear the search box
+  // mid-keystroke and lose the caret.
+  if(!pShell){
+    $('#panel').innerHTML=`<div class="pops">
+      <div class="pop-head">
+        <div>
+          <h2>Pilot operations</h2>
+          <div class="sub">Squadron personnel and flight status. Select a pilot for the full record.</div>
+        </div>
+        <div class="pop-ctx" id="pCtx"></div>
+      </div>
+      <div class="kpi" id="pKpi"></div>
+
+      <div class="pband">
+        <div>
+          <div class="srule"><span>Active flight line</span><i></i></div>
+          <div class="fl" id="pFlight"></div>
+        </div>
+        <div>
+          <div class="srule"><span>Readiness</span><i></i></div>
+          <div class="rd" id="pReady"></div>
+        </div>
+      </div>
+
+      <div class="srule"><span>Personnel roster</span><i></i></div>
+      <div class="rct">
+        <label class="psearch">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/>
+            <path d="M10.5 10.5 L14 14"/></svg>
+          <input id="pQ" type="search" placeholder="SEARCH PILOT..."
+                 aria-label="Search pilots" autocomplete="off">
+        </label>
+        <div class="pfilt" id="pF" role="group" aria-label="Filter roster">
+          <button data-f="all" class="on">ALL</button>
+          <button data-f="connected">CONNECTED</button>
+          <button data-f="airborne">AIRBORNE</button>
+          <button data-f="command">COMMAND</button>
+        </div>
+        <span class="count" id="pCount"></span>
+      </div>
+      <div id="pRoster"></div>
+    </div>`;
+
+    const q=$('#pQ');
+    q.value=pQuery;
+    q.oninput=()=>setPilotView({q:q.value});
+    $('#pF').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+      $('#pF').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+      setPilotView({filter:b.dataset.f});
+    });
+    pShell=true;
+  }
+
+  const c=pilotCounts(recs);
+  const st=D.status, age=st?Date.now()/1000-st.ts:1e9;
+  const on=st&&st.online&&age<STALE;
+
+  $('#pCtx').innerHTML=`
+    <div><span class="k">Theatre</span>${esc((D.zones&&D.zones.theatre)||'Caucasus')}</div>
+    <div><span class="k">Feed</span><span class="${on?'live':'dead'}">${on?'LIVE':'OFFLINE'}</span></div>
+    <div><span class="k">Synced</span>${st?ago(age):'--'}</div>
+    <div><span class="k">Roster</span>${c.total}</div>`;
+
+  renderPilotsKpi(recs,c);
+  renderReadiness(recs,c);
+  renderActiveFlightLine(recs);
+  bindPilotOpen($('#pFlight'));
+  renderPilotRoster(recs);
+  if(pSel) renderPilotDetail(pSel);
 }
 
 // --- Campaign history -------------------------------------------------------
@@ -1685,6 +2153,11 @@ function draw(){
   $('#intel').classList.toggle('on', intel);
   $('#intel').setAttribute('aria-pressed', intel?'true':'false');
 
+  // The drawer floats above every view, so it has to go when the view does.
+  if(view!=='pilots' && pSel) closePilot();
+  // Rebuild the pilots shell on re-entry so stale nodes are never reused.
+  if(view!=='pilots') pShell=false;
+
   if(isList) renderList();
   else if(isPanel) PANELS[view]();
   else { map.invalidateSize(); renderMap(intel); mapNote(); renderHud();
@@ -1700,6 +2173,9 @@ $('#views').querySelectorAll('.sb').forEach(b=>b.onclick=()=>{
   });
   draw();
 });
+
+$('#pscrim').onclick=closePilot;
+addEventListener('keydown',e=>{ if(e.key==='Escape' && pSel) closePilot(); });
 
 $('#intel').onclick=()=>{
   intel=!intel;
