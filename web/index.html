@@ -76,6 +76,59 @@ html,body{margin:0;height:100%;background:var(--graphite);color:var(--ink);
   font:400 13px/1.5 var(--ui);
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+
+/* ---------- page substrate ----------
+   A fixed layer beneath every view except Map, carrying the chart apparatus
+   the board is already dressed as: a graticule, ruled margins, and a ghost of
+   the theatre itself. It never intercepts a pointer and never scrolls.
+
+   Contrast is capped hard and deliberately. Tasking rows (.mc) are
+   transparent, so this sits directly behind body text on the Ops page; the
+   grid is drawn at 2.5% and the 5-minor emphasis at 4.5%, which reads on an
+   unlit panel and disappears the moment your eye lands on a number. If you
+   raise these, check Ops at 1366 before you keep it. */
+#bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+  background-image:
+    repeating-linear-gradient(to right,
+      rgba(230,237,247,.045) 0 1px, transparent 1px 320px),
+    repeating-linear-gradient(to bottom,
+      rgba(230,237,247,.045) 0 1px, transparent 1px 320px),
+    repeating-linear-gradient(to right,
+      rgba(230,237,247,.025) 0 1px, transparent 1px 64px),
+    repeating-linear-gradient(to bottom,
+      rgba(230,237,247,.025) 0 1px, transparent 1px 64px)}
+
+/* The grid is apparatus, not information. Anyone who has asked not to be
+   given decoration should not be given it. */
+@media(prefers-reduced-motion:reduce){#bg{background-image:none}}
+
+/* Margin apparatus. Only on the document pages, only where a margin exists.
+   #bg sits behind the fixed header, so everything here starts below it. */
+#bg .reg{display:none;position:absolute;width:13px;height:13px;
+  border:1px solid rgba(230,237,247,.13)}
+#bg .reg.tl{top:calc(var(--hdrh) + 16px);left:16px;border-right:0;border-bottom:0}
+#bg .reg.tr{top:calc(var(--hdrh) + 16px);right:16px;border-left:0;border-bottom:0}
+#bg .reg.bl{bottom:16px;left:16px;border-right:0;border-top:0}
+#bg .reg.br{bottom:16px;right:16px;border-left:0;border-top:0}
+
+/* The theatre watermark. Anchored bottom-right, where every page has its
+   deepest dead area. Hidden on a phone: 47vw of a 414px screen is 190px of
+   dots behind an already tight roster. */
+#ghost{display:none;position:absolute;right:2vw;bottom:2.5vh;
+  width:40vw;height:44vh}
+#ghost svg{width:100%;height:100%;overflow:visible}
+@media(min-width:1000px){#ghost{display:block}}
+
+@media(min-width:1600px){
+  #bg.doc .reg{display:block}
+  /* Edge rulers, one per margin. */
+  #bg.doc::before,#bg.doc::after{content:'';position:absolute;
+    top:calc(var(--hdrh) + 40px);bottom:40px;width:7px;
+    background:repeating-linear-gradient(to bottom,
+      rgba(230,237,247,.09) 0 1px, transparent 1px 15px)}
+  #bg.doc::before{left:29px}
+  #bg.doc::after{right:29px}
+}
 a{color:var(--blue)}
 
 /* Every number in this interface is mono and tabular. That single rule is
@@ -864,6 +917,8 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
 </style>
 </head>
 <body>
+
+<div id="bg" aria-hidden="true"><i class="reg tl"></i><i class="reg tr"></i><i class="reg bl"></i><i class="reg br"></i><div id="ghost"></div></div>
 
 <header id="hdr">
   <div class="masthead">
@@ -2129,12 +2184,66 @@ function renderFiles(){
   </div>`;
 }
 
+// Zone dots for the background watermark, in a normalised 1000-wide box.
+// Returns null when the campaign has not loaded, so the caller can leave the
+// backdrop empty rather than draw a guess.
+function ghostPoints(){
+  const zpos=(D.zones&&D.zones.zones)||{}, c=D.campaign;
+  if(!c||!c.zones) return null;
+  const raw=[];
+  Object.values(c.zones).forEach(z=>{
+    const ll=zpos[z.name];
+    if(!Array.isArray(ll)) return;
+    raw.push({lat:ll[0], lon:ll[1], side:z.side, front:(z.distToFront??9)<=1});
+  });
+  if(raw.length<3) return null;
+  // Equirectangular about the theatre's own mean latitude, which is what keeps
+  // it from looking stretched east-west. Scaling each point by its own
+  // cos(lat) instead shears the map: only 4% across the Caucasus, but it makes
+  // the aspect ratio depend on where the zones happen to sit, which is how a
+  // north-south theatre ends up several times too tall.
+  const lat0=raw.reduce((s,p)=>s+p.lat,0)/raw.length;
+  const k=Math.cos(lat0*Math.PI/180);
+  const proj=raw.map(p=>({x:p.lon*k, y:-p.lat, side:p.side, front:p.front}));
+  const xs=proj.map(p=>p.x), ys=proj.map(p=>p.y);
+  const x0=Math.min(...xs), x1=Math.max(...xs);
+  const y0=Math.min(...ys), y1=Math.max(...ys);
+  const sx=x1-x0||1, sy=y1-y0||1;
+  const h=Math.round(1000*sy/sx);
+  return {h, pts:proj.map(p=>({
+    x:+(((p.x-x0)/sx)*1000).toFixed(1),
+    y:+(((p.y-y0)/sy)*h).toFixed(1),
+    side:p.side, front:p.front}))};
+}
+
+function renderGhost(){
+  const host=$('#ghost'); if(!host) return;
+  const g=ghostPoints();
+  if(!g){ host.innerHTML=''; return; }
+  // A geographic viewBox lets the browser scale this on resize, which is why
+  // there is no resize handler here.
+  const A={0:.085, 1:.075, 2:.10};   // red reads hotter than blue at equal alpha
+  const dots=g.pts.map(p=>
+    `<circle cx="${p.x}" cy="${p.y}" r="${p.front?11:7}" fill="${SIDE[p.side]}" `+
+    `fill-opacity="${(A[p.side]??.085)+(p.front?.045:0)}"/>`).join('');
+  host.innerHTML=
+    `<svg viewBox="-14 -14 1028 ${g.h+28}" preserveAspectRatio="xMidYMax meet" `+
+    `aria-hidden="true">${dots}</svg>`;
+}
+
 const PANELS={pilots:renderPilots, history:renderHistory, files:renderFiles};
 
 function draw(){
   renderHeader();
   syncHeaderHeight();
   const isList=view==='list', isPanel=!!PANELS[view], isMap=!isList&&!isPanel;
+
+  // Map draws its own world; the substrate would only sit under tiles.
+  $('#bg').style.display    = isMap  ?'none' :'block';
+  // Ops runs its columns to both edges; the margin apparatus belongs to the
+  // three centred document pages.
+  $('#bg').classList.toggle('doc', isPanel);
+  if(!isMap) renderGhost();
 
   $('#list').style.display  = isList ?'grid' :'none';
   $('#map').style.display   = isMap  ?'block':'none';
