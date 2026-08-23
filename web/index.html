@@ -1023,13 +1023,14 @@ const roleOf = n => ROLES[String(n||'').trim().toLowerCase()] || null;
 // XP Pretense already writes and is never written back, so the mission file
 // and the server are untouched.
 //
-// Thresholds are fitted to this squadron's real spread, not picked round. At
-// the time of writing the roster runs from 0 to 23,425 with a median of 613,
-// so the early steps are close together -- a new pilot should move twice in
-// their first few nights -- and each step is then roughly 2.5x the last,
-// tapering to under 2x at the top. That puts the current leader at Air
-// Commodore with two ranks still to earn, and leaves the three air officer
-// ranks above genuinely rare rather than decorative.
+// The first four ranks come quickly, so a new pilot moves twice in their first
+// few nights: the roster's median is 613 XP and its floor is 0.
+//
+// Then there is a deliberate wall. Group Captain sits at 40,000, close to
+// twice what the squadron's strongest pilot has accumulated so far, and every
+// rank above it is a flat 30,000 further on rather than a multiple. Senior
+// rank is meant to be a season's work rather than a month's, and the even
+// steps above the wall mean the last four promotions all cost the same.
 //
 // Marshal of the Indian Air Force is deliberately absent. It is a five-star
 // honour held once in the service's history, by Arjan Singh, and is not a
@@ -1042,11 +1043,11 @@ const RANKS=[
   {xp:    250, ab:'Flt Lt',   name:'Flight Lieutenant',  braid:[1,1]},
   {xp:    750, ab:'Sqn Ldr',  name:'Squadron Leader',    braid:[1,0.5,1]},
   {xp:  2000, ab:'Wg Cdr',   name:'Wing Commander',     braid:[1,1,1]},
-  {xp:  5000, ab:'Gp Capt',  name:'Group Captain',      braid:[1,1,1,1]},
-  {xp: 12000, ab:'Air Cmde', name:'Air Commodore',      braid:[2]},
-  {xp: 30000, ab:'AVM',      name:'Air Vice Marshal',   braid:[2,1]},
-  {xp: 60000, ab:'Air Mshl', name:'Air Marshal',        braid:[2,1,1]},
-  {xp:100000, ab:'ACM',      name:'Air Chief Marshal',  braid:[2,1,1,1]},
+  {xp: 40000, ab:'Gp Capt',  name:'Group Captain',      braid:[1,1,1,1]},
+  {xp: 70000, ab:'Air Cmde', name:'Air Commodore',      braid:[2]},
+  {xp:100000, ab:'AVM',      name:'Air Vice Marshal',   braid:[2,1]},
+  {xp:130000, ab:'Air Mshl', name:'Air Marshal',        braid:[2,1,1]},
+  {xp:160000, ab:'ACM',      name:'Air Chief Marshal',  braid:[2,1,1,1]},
 ];
 
 // Highest rank the pilot has reached, plus the next one up when there is one.
