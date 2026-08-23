@@ -384,9 +384,9 @@ nav#views .sb.on::before{content:'';position:absolute;left:0;right:0;top:-1px;
 .pcard{border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;
   padding:18px 20px 0;margin:0 0 12px}
 .phead{display:flex;gap:14px;align-items:flex-start}
-.pav{width:56px;height:56px;border-radius:12px;flex:none;display:grid;
-  place-items:center;font:700 19px/1 ui-sans-serif,system-ui;letter-spacing:.02em;
-  background:var(--avb);color:var(--avf);border:1px solid var(--avf)}
+.pav{width:44px;height:44px;border-radius:var(--r);flex:none;display:grid;
+  place-items:center;font:600 15px/1 var(--mono);letter-spacing:.04em;
+  background:var(--raised);color:var(--ink-2);border:1px solid var(--rule-2)}
 .pname{font:600 17px/1.2 ui-sans-serif,system-ui;color:#ffc848;margin-bottom:7px}
 .ppills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .pill2{background:var(--panel2);border:1px solid var(--line);border-radius:6px;
@@ -608,7 +608,7 @@ table.lb tr.pr:nth-child(-n+6) td.pos{color:var(--ink-2)}
 .cs{display:flex;align-items:center;gap:9px;min-width:0}
 .cs .pav{width:24px;height:24px;border-radius:3px;flex:none;display:grid;
   place-items:center;font:600 10px/1 var(--mono);
-  background:var(--avb);color:var(--avf);border:1px solid var(--avf)}
+  background:var(--raised);color:var(--ink-2);border:1px solid var(--rule-2)}
 .cs .nmw{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   font:500 13px/1.3 var(--ui);color:var(--ink)}
 .caret{display:inline-block;width:8px;color:var(--ink-3);font-size:8px;
@@ -830,7 +830,7 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
 
 /* avatar with a status ring: operational identifier, not a profile photo */
 .pav{position:relative}
-.pav.ring::after{content:'';position:absolute;inset:-3px;border-radius:5px;
+.pav.ring::after{content:'';position:absolute;inset:-3px;border-radius:6px;
   border:1px solid var(--ringc,transparent);pointer-events:none}
 
 /* ---------- intelligence drawer ---------- */
@@ -853,7 +853,7 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
 .dw-id{display:flex;gap:14px;padding:18px 16px;border-bottom:1px solid var(--rule)}
 .dw-id .av{width:52px;height:52px;border-radius:4px;flex:none;display:grid;
   place-items:center;font:600 18px/1 var(--mono);
-  background:var(--avb);color:var(--avf);border:1px solid var(--avf)}
+  background:var(--raised);color:var(--ink-2);border:1px solid var(--rule-2)}
 .dw-id .nm{font:600 19px/1.15 var(--ui);color:var(--ink);word-break:break-word}
 .dw-id .rl{margin-top:7px}
 .dw-id .stline{margin-top:9px}
@@ -1012,19 +1012,18 @@ const ROLES = {
 };
 const roleOf = n => ROLES[String(n||'').trim().toLowerCase()] || null;
 
-// Deterministic avatar colour per pilot, so the same person is always the same
-// colour without storing anything.
+// Initials for a pilot chip. No colour: the chip is monochrome and the status
+// ring carries the only meaning, so a per-name hue would just be decoration
+// competing with a palette where green already means airborne.
 function avatar(name){
-  let h=0; const t=String(name||'?');
-  for(let i=0;i<t.length;i++) h=(h*31 + t.charCodeAt(i))|0;
-  const hue=Math.abs(h)%360;
+  const t=String(name||'?');
   // The word-initials approach only understands Latin; a Cyrillic name like
   // Терминатор stripped to nothing and rendered as '?'. Fall back to the first
   // two characters of the raw name before giving up.
   const initials=t.replace(/[^A-Za-z0-9]+/g,' ').trim().split(/\s+/)
     .slice(0,2).map(w=>w[0]).join('').toUpperCase()
     || t.trim().slice(0,2).toUpperCase() || '?';
-  return {initials, bg:`hsl(${hue} 45% 16%)`, fg:`hsl(${hue} 70% 62%)`};
+  return {initials};
 }
 let view = 'list', active = new Set(CATS);
 
@@ -1735,7 +1734,7 @@ function pAvatar(r,cls){
   const av=avatar(r.name);
   const ring={airborne:'var(--jade)',cockpit:'var(--blue)',online:'var(--blue-dim)'}[r.status];
   return `<span class="pav ${cls||''} ${ring?'ring':''}"
-    style="--avb:${av.bg};--avf:${av.fg}${ring?`;--ringc:${ring}`:''}">${esc(av.initials)}</span>`;
+    ${ring?`style="--ringc:${ring}"`:''}>${esc(av.initials)}</span>`;
 }
 
 function renderPilotsKpi(recs,c){
@@ -1921,7 +1920,7 @@ function renderPilotDetail(name){
     </div>
 
     <div class="dw-id">
-      <span class="av" style="--avb:${av.bg};--avf:${av.fg}">${esc(av.initials)}</span>
+      <span class="av">${esc(av.initials)}</span>
       <div style="min-width:0">
         <div class="nm">${esc(r.name)}</div>
         ${r.role?`<div class="rl"><span class="badge role">${esc(r.role.tag)}</span></div>
