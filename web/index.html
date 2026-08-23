@@ -6,191 +6,298 @@
 <title>SkyForge Mission Board</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<!-- Archivo for words, IBM Plex Mono for every number. Both come from the
+     technical/industrial world rather than the usual UI-font shortlist, and
+     the split is the rule that makes the whole board read as an instrument.
+     Preconnect because these block first paint of the masthead. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
+/* ===================================================================
+   SKYFORGE - air operations board
+   Palette is derived from an unlit operations room and a sectional
+   chart: cool graphite surfaces, chart blue for own forces, a
+   desaturated chart red for hostile. Nothing here is decorative --
+   if a colour appears, it means something.
+   =================================================================== */
 :root{
-  --bg:#0a0d12; --panel:#12161d; --panel2:#171c25; --line:#242b36;
-  --fg:#e7edf5; --dim:#8b96a8; --dimmer:#5c6675;
-  --blue:#4a9eff; --red:#ff4d4d; --green:#3fd07a; --amber:#ffb020;
-  --violet:#a970ff; --cyan:#3fd8d8; --pink:#ff6ba8;
-  --r:10px;
-  /* Header height. Seeded with the historical constant so the first paint is
-     right, then measured for real by syncHeaderHeight(). */
-  --hdrh:196px;
+  /* surfaces, darkest to lightest */
+  --graphite:#0A0E14;
+  --slate:#111823;
+  --panel:#161F2B;
+  --raised:#1D2836;
+
+  /* hairlines. --rule is structural, --rule-2 separates, --rule-hot is focus */
+  --rule:#1E2836;
+  --rule-2:#283444;
+  --rule-hot:#3A5570;
+
+  /* text */
+  --ink:#E6EDF7;
+  --ink-2:#94A5BC;
+  --ink-3:#5E6E85;
+
+  /* semantic. Blue = friendly/own, rose = hostile, amber = attention,
+     jade = ready. Never used decoratively. */
+  --blue:#4C8FE8;
+  --blue-dim:#2C5A94;
+  --rose:#D9455C;
+  --amber:#E8A33D;
+  --jade:#45C08A;
+  --neutral:#7C8CA3;
+
+  /* type */
+  --ui:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  --r:3px;              /* small radius on purpose: zero everywhere is a tell */
+  --hdrh:150px;
+
+  /* Transitional aliases, removed as each view is rebuilt in later phases.
+     Note what happens to the old category colours: violet, cyan and pink all
+     collapse to neutral, because colour now means faction and nothing else.
+     SEAD being violet and CSAR being pink told a pilot nothing. */
+  --bg:var(--graphite);
+  --panel2:var(--raised);
+  --line:var(--rule);
+  --fg:var(--ink);
+  --dim:var(--ink-2);
+  --dimmer:var(--ink-3);
+  --red:var(--rose);
+  --green:var(--jade);
+  --violet:var(--ink-2);
+  --cyan:var(--ink-2);
+  --pink:var(--ink-2);
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
-  font:13px/1.45 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif}
-button{font:inherit;color:inherit;cursor:pointer}
+html,body{margin:0;height:100%;background:var(--graphite);color:var(--ink);
+  font:400 13px/1.5 var(--ui);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+a{color:var(--blue)}
 
-/* ---------- floating header ---------- */
-#hdr{position:fixed;top:12px;left:12px;right:12px;z-index:1000;
-  background:rgba(18,22,29,.94);backdrop-filter:blur(10px);
-  border:1px solid var(--line);border-radius:14px;padding:12px 16px}
-.hrow{display:flex;align-items:center;gap:14px}
-.brand{display:flex;align-items:center;gap:11px;flex:none}
-.mark{width:34px;height:34px;border-radius:50%;border:2px solid var(--amber);
-  display:grid;place-items:center;font-size:13px;font-weight:800;color:var(--amber);
-  letter-spacing:-.5px}
-.brand h1{font-size:19px;margin:0;letter-spacing:.12em;font-weight:800}
-.ver{font-size:10px;color:var(--dim);border:1px solid var(--line);
-  border-radius:20px;padding:2px 8px}
-.spacer{flex:1}
-.hstat{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:12px}
-.hstat b{color:var(--fg)}
+/* Every number in this interface is mono and tabular. That single rule is
+   what makes columns line up and readouts look like instruments. */
+.num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
-/* ---------- server tabs ---------- */
-#tabs{display:flex;gap:8px;margin-top:11px;overflow-x:auto;padding-bottom:2px}
-.tab{display:flex;align-items:center;gap:9px;background:var(--panel2);
-  border:1px solid var(--line);border-radius:9px;padding:7px 12px;white-space:nowrap}
-.tab.on{border-color:var(--green);box-shadow:0 0 0 1px rgba(63,208,122,.25)}
-.tab .nm{font-weight:700;font-size:13px}
-.tab .era{font-size:9px;color:var(--dim);letter-spacing:.1em}
-.pill{font-size:11px;font-weight:700;border-radius:5px;padding:1px 7px;
-  background:#1e2530;color:var(--dim)}
-.pill.av{color:var(--green)} .pill.ac{color:var(--amber)}
+/* Type roles. Mono for eyebrows is a chart/ops convention, not decoration. */
+.eyebrow{font:500 9.5px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink-3)}
 
-/* ---------- status strip ---------- */
-#strip{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
-.chip{display:flex;align-items:center;gap:7px;background:var(--panel2);
-  border:1px solid var(--line);border-radius:8px;padding:7px 13px;
-  color:var(--dim);font-size:12px;flex:1;justify-content:center;min-width:120px}
-.chip b{color:var(--fg)}
-.dot{width:8px;height:8px;border-radius:50%;flex:none}
-.dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
-.dot.off{background:#5c6675}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 
-/* ---------- controls ---------- */
-#ctl{display:flex;align-items:center;gap:10px;margin-top:10px;
-  padding-top:10px;border-top:1px solid var(--line);flex-wrap:wrap}
-.lbl{font-size:10px;color:var(--dimmer);letter-spacing:.13em}
-.seg{display:flex;gap:5px}
-.sb{background:var(--panel2);border:1px solid var(--line);border-radius:7px;
-  padding:5px 13px;font-size:12px;color:var(--dim)}
-.sb.on{background:rgba(74,158,255,.16);border-color:var(--blue);color:var(--blue)}
-.fb{background:transparent;border:1px solid var(--line);border-radius:16px;
-  padding:3px 11px;font-size:11px;color:var(--dim)}
-.fb.on{border-color:currentColor}
-.fb[data-c=cas]{color:var(--amber)} .fb[data-c=sead]{color:var(--violet)}
-.fb[data-c=supply]{color:var(--cyan)} .fb[data-c=patrol]{color:var(--blue)}
-.fb[data-c=strike]{color:var(--red)} .fb[data-c=assault]{color:var(--pink)}
-.fb[data-c=csar]{color:var(--green)}
+/* ---------- masthead ---------- */
+#hdr{position:fixed;top:0;left:0;right:0;z-index:1000;
+  background:linear-gradient(180deg,var(--slate) 0%,rgba(17,24,35,.97) 100%);
+  border-bottom:1px solid var(--rule)}
+
+.masthead{display:flex;align-items:stretch;height:52px;
+  border-bottom:1px solid var(--rule)}
+
+.brand{display:flex;align-items:center;gap:11px;padding:0 18px;flex:none;
+  border-right:1px solid var(--rule);text-decoration:none;color:inherit}
+.brand svg{display:block;width:26px;height:26px;flex:none}
+.wordmark{font:700 17px/1 var(--ui);letter-spacing:.11em;color:var(--ink)}
+.brand .sub{font:500 8.5px/1 var(--mono);letter-spacing:.22em;color:var(--ink-3);
+  border-left:1px solid var(--rule-2);padding-left:10px;margin-left:1px}
+
+/* Theatre block: the one place a name and its metadata sit together. */
+#theatre{display:flex;align-items:center;gap:12px;padding:0 18px;flex:none;
+  border-right:1px solid var(--rule)}
+#theatre .tname{font:600 13px/1.2 var(--ui);letter-spacing:.01em}
+#theatre .tmeta{font:400 9.5px/1.2 var(--mono);letter-spacing:.13em;color:var(--ink-3);
+  text-transform:uppercase}
+#theatre .tally{display:flex;gap:1px;margin-left:2px}
+#theatre .tally b{font:500 11px/1 var(--mono);padding:5px 8px;background:var(--panel);
+  border:1px solid var(--rule-2)}
+#theatre .tally b:first-child{border-radius:var(--r) 0 0 var(--r);color:var(--ink-2)}
+#theatre .tally b:last-child{border-radius:0 var(--r) var(--r) 0;color:var(--amber)}
+
+nav#views{display:flex;align-items:stretch;margin-left:auto}
+nav#views .sb{position:relative;padding:0 20px;display:flex;align-items:center;
+  font:500 11.5px/1 var(--ui);letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-3);border-left:1px solid var(--rule);
+  transition:color .16s ease,background .16s ease}
+nav#views .sb:hover{color:var(--ink-2);background:rgba(76,143,232,.05)}
+nav#views .sb.on{color:var(--ink);background:var(--panel)}
+/* The active marker is a top rule, like a selected tab on a flight strip
+   board -- not a pill, which is what every dashboard reaches for. */
+nav#views .sb.on::before{content:'';position:absolute;left:0;right:0;top:-1px;
+  height:2px;background:var(--blue)}
+
+/* ---------- telemetry rail ---------- */
+#rail{display:flex;align-items:center;gap:0;height:34px;overflow-x:auto;
+  scrollbar-width:none}
+#rail::-webkit-scrollbar{display:none}
+#rail .cell{display:flex;align-items:center;gap:7px;padding:0 14px;height:100%;
+  flex:none;border-right:1px solid var(--rule);white-space:nowrap}
+#rail .cell .k{font:500 9px/1 var(--mono);letter-spacing:.16em;color:var(--ink-3);
+  text-transform:uppercase}
+#rail .cell .v{font:500 12px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--ink)}
+#rail .cell.state .v{font-weight:600;letter-spacing:.08em}
+#rail .cell.on   .v{color:var(--jade)}
+#rail .cell.off  .v{color:var(--rose)}
+#rail .cell.blue .v{color:var(--blue)}
+#rail .cell.rose .v{color:var(--rose)}
+/* The instrument line: a single readout, the way weather is actually read. */
+#rail .metar{font:400 11.5px/1 var(--mono);letter-spacing:.06em;color:var(--ink-2)}
+#rail .metar b{color:var(--ink);font-weight:500}
+#rail .grow{flex:1 1 auto;border-right:0}
+#rail .addr{cursor:pointer}
+#rail .addr:hover .v{color:var(--blue)}
+
+/* live pulse: state, not decoration -- it ticks when data lands */
+.beat{width:6px;height:6px;border-radius:50%;flex:none;background:var(--ink-3)}
+.beat.on{background:var(--jade);box-shadow:0 0 0 0 rgba(69,192,138,.55);
+  animation:beat 2.4s ease-out infinite}
+.beat.off{background:var(--rose)}
+@keyframes beat{
+  0%{box-shadow:0 0 0 0 rgba(69,192,138,.5)}
+  70%{box-shadow:0 0 0 7px rgba(69,192,138,0)}
+  100%{box-shadow:0 0 0 0 rgba(69,192,138,0)}
+}
+
+/* ---------- filter bar (List view only) ---------- */
+#filters{display:flex;align-items:center;gap:12px;height:38px;padding:0 18px;
+  border-top:1px solid var(--rule);background:var(--graphite)}
+#cats{display:flex;gap:6px;flex-wrap:wrap}
+/* Category is a mono tag on a neutral chip. It deliberately carries no colour:
+   colour is reserved for faction, so a red chip always means hostile. */
+.fb{font:500 9.5px/1 var(--mono);letter-spacing:.13em;padding:5px 9px;
+  border:1px solid var(--rule-2);border-radius:var(--r);color:var(--ink-3);
+  background:transparent;transition:all .16s ease}
+.fb:hover{color:var(--ink-2);border-color:var(--rule-hot)}
+.fb.on{color:var(--ink);border-color:var(--blue);background:rgba(76,143,232,.1)}
+#upd{margin-left:auto;font:400 10px/1 var(--mono);color:var(--ink-3);
+  letter-spacing:.08em}
+
+@media(max-width:1100px){
+  .brand .sub{display:none}
+  #theatre .tmeta{display:none}
+  nav#views .sb{padding:0 13px;letter-spacing:.08em}
+}
+@media(max-width:760px){
+  /* The nav needs its own row on a phone. Without flex-wrap it just ran off
+     the right edge and the last two views were unreachable. */
+  .masthead{height:auto;flex-wrap:wrap}
+  .brand{padding:0 12px;gap:8px}
+  .wordmark{font-size:14px;letter-spacing:.08em}
+  #theatre{padding:0 12px}
+  .brand{flex:1;min-width:0;height:46px}
+  #theatre{height:46px;margin-left:auto;border-right:0}
+  nav#views{width:100%;border-top:1px solid var(--rule);margin-left:0}
+  nav#views .sb{flex:1;justify-content:center;padding:12px 4px;font-size:10px;
+    letter-spacing:.06em;border-left:1px solid var(--rule)}
+  nav#views .sb:first-child{border-left:0}
+
+  /* On a phone the filter bar is the least valuable row: keep the chips,
+     drop the label and the clock. */
+  #filters{height:auto;padding:8px 12px;flex-wrap:wrap;gap:8px}
+  #filters .eyebrow,#upd{display:none}
+  #rail .cell{padding:0 11px}
+}
 
 /* ---------- body ---------- */
 #main{position:absolute;inset:0;padding-top:var(--hdrh)}
 #map{height:100%;background:#070a0e}
-#list{height:100%;overflow-y:auto;padding:8px 12px 24px;
-  display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
-@media(max-width:900px){#list{grid-template-columns:1fr}}
-.col h3{font-size:11px;letter-spacing:.14em;color:var(--dim);margin:0 0 9px;
-  position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:2}
-.col h3 span{color:var(--fg)}
 
-/* ---------- mission cards ---------- */
-.mc{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--dim);
-  border-radius:8px;padding:9px 12px;margin-bottom:8px}
-.mc.cas{border-left-color:var(--amber)} .mc.sead{border-left-color:var(--violet)}
-.mc.supply{border-left-color:var(--cyan)} .mc.patrol{border-left-color:var(--blue)}
-.mc.strike{border-left-color:var(--red)} .mc.assault{border-left-color:var(--pink)}
-.mc.csar{border-left-color:var(--green)}
-.mc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.mid{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--dimmer)}
-.cat{font-size:9px;font-weight:800;letter-spacing:.1em;border-radius:4px;
-  padding:2px 7px;background:#1e2530}
-.cat.cas{color:var(--amber)} .cat.sead{color:var(--violet)}
-.cat.supply{color:var(--cyan)} .cat.patrol{color:var(--blue)}
-.cat.strike{color:var(--red)} .cat.assault{color:var(--pink)}
-.cat.csar{color:var(--green)}
-.stars{color:var(--amber);font-size:10px;letter-spacing:1px}
-.mc .zone{margin-top:5px;font-weight:700;font-size:13px;display:flex;
-  align-items:center;gap:7px}
-.mc .desc{color:var(--dim);font-size:12px;margin-top:2px}
-.mc-foot{display:flex;justify-content:space-between;align-items:center;margin-top:7px}
-.xp{font-size:11px;font-weight:700;color:var(--green)}
-.meta{font-size:11px;color:var(--dimmer);font-family:ui-monospace,Consolas,monospace}
-.prog{height:5px;background:#1e2530;border-radius:3px;margin-top:7px;overflow:hidden}
-.prog i{display:block;height:100%;background:var(--green)}
-.empty{color:var(--dimmer);font-style:italic;padding:14px;text-align:center;
-  border:1px dashed var(--line);border-radius:8px}
+/* Two tasking columns. On a wide screen they sit side by side; the gutter is
+   a hairline rather than whitespace so the board reads as one document. */
+#list{height:100%;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;
+  align-content:start}
+#list .col{min-width:0;border-right:1px solid var(--rule)}
+#list .col:last-child{border-right:0}
 
-.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);
-  color:var(--fg);border:1px solid var(--line)}
-.leaflet-container{background:#070a0e;font:inherit}
-.trk{font-family:ui-monospace,Consolas,monospace;font-size:10px;line-height:1.15;
-  white-space:nowrap;text-shadow:0 0 4px #000,0 0 4px #000}
-#offline{position:absolute;inset:var(--hdrh) 0 0;display:grid;place-items:center;
-  background:rgba(10,13,18,.72);z-index:500;text-align:center}
+.colhead{position:sticky;top:0;z-index:2;display:flex;align-items:baseline;gap:10px;
+  padding:11px 16px 10px;background:var(--graphite);
+  border-bottom:1px solid var(--rule)}
+.colhead h3{margin:0;font:600 11px/1 var(--ui);letter-spacing:.19em;
+  text-transform:uppercase;color:var(--ink-2)}
+.colhead .n{font:500 11px/1 var(--mono);color:var(--ink-3)}
+.colhead .rule{flex:1;height:1px;background:var(--rule-2)}
 
-/* --- panel views (pilots / history / files) ----------------------------- */
-#panel{height:100%;overflow-y:auto;padding:20px 26px 46px}
-#mapnote{position:absolute;left:0;right:0;bottom:0;z-index:600;pointer-events:none;
-  text-align:center;padding:7px 12px;font-size:11.5px;color:var(--dim);
-  background:linear-gradient(transparent,rgba(10,13,18,.9) 45%)}
-.pnl{max-width:1040px;margin:0 auto}
-.pnl.wide{max-width:none}
-.pnl h2{font:600 13px/1 ui-sans-serif,system-ui;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--dim);margin:0 0 14px}
-.pnl .sub{font-size:12px;color:var(--dim);margin:-8px 0 18px;line-height:1.6}
-.pos{color:var(--dim);width:34px;font-variant-numeric:tabular-nums}
-.pos.top{color:#ffc848;font-weight:700}
-.xp{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;width:90px}
-.badge{display:inline-block;font:700 9px/1 ui-sans-serif,system-ui;letter-spacing:.08em;
-  padding:3px 6px;border-radius:4px;margin-left:6px;vertical-align:1px}
-.badge.cmd{background:rgba(255,200,72,.16);color:#ffc848}
-.badge.sb{background:rgba(74,158,255,.16);color:var(--blue)}
-.badge.on{background:rgba(74,222,128,.16);color:#4ade80}
-.badge.role{background:rgba(169,112,255,.18);color:var(--violet);
-  border:1px solid rgba(169,112,255,.35)}
-.pnl .roles{font-size:12px;color:var(--dim);margin:-6px 0 16px;line-height:1.7}
-.pnl .roles b{color:var(--violet);font-weight:600}
-.dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
-.dlc{border:1px solid var(--line);border-radius:10px;padding:14px 16px;
-  background:rgba(255,255,255,.02)}
-.dlc .n{font-weight:600;font-size:14px;margin-bottom:2px}
-.dlc .v{font:600 11px/1 ui-monospace,monospace;color:var(--blue);margin-bottom:8px}
-.dlc .d{font-size:12px;color:var(--dim);line-height:1.55}
-.dlc a{color:var(--blue);text-decoration:none;font-size:12px;font-weight:600}
-.dlc a:hover{text-decoration:underline}
-.dlc .ask{font-size:12px;color:#ffc848}
-.req{margin:0 0 18px;padding:12px 14px;border-radius:10px;font-size:12.5px;
-  line-height:1.6;background:rgba(255,200,72,.07);border:1px solid rgba(255,200,72,.22)}
-.tlwrap{border:1px solid var(--line);border-radius:10px;padding:16px;
-  background:rgba(255,255,255,.02)}
-.tlwrap svg{width:100%;height:220px;display:block}
-.tlx{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);
-  margin-top:6px;font-variant-numeric:tabular-nums}
-.tlk{display:flex;gap:16px;font-size:11.5px;color:var(--dim);margin-bottom:12px}
-.tlk i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
-.empty{color:var(--dim);font-size:13px;padding:26px 0;text-align:center}
+/* ---------- tasking line ---------- */
+.mc{position:relative;display:grid;
+  grid-template-columns:44px 1fr auto;
+  gap:0 12px;align-items:center;
+  padding:9px 16px 9px 0;
+  border-bottom:1px solid var(--rule);
+  cursor:default;transition:background .14s ease}
+.mc:hover{background:rgba(76,143,232,.045)}
 
-/* --- GCI controller panel ----------------------------------------------- */
-/* top must clear the fixed header: an absolutely-positioned child is laid
-   out against #main's PADDING box, so padding-top does not move it. */
-#gci{position:absolute;top:var(--hdrh);right:0;bottom:0;width:310px;z-index:620;
-  overflow-y:auto;padding:14px 14px 40px;background:rgba(12,16,22,.93);
-  backdrop-filter:blur(8px);border-left:1px solid var(--line);font-size:12px}
-@media(max-width:820px){#gci{display:none!important}}
-#gci h3{font:600 9.5px/1 ui-sans-serif,system-ui;letter-spacing:.15em;
-  text-transform:uppercase;color:var(--dimmer);margin:16px 0 7px}
-#gci h3:first-child{margin-top:0}
-#gci .row{display:flex;justify-content:space-between;gap:8px;padding:4px 0;
-  border-bottom:1px solid rgba(255,255,255,.045);line-height:1.35}
-#gci .row:last-child{border-bottom:0}
-#gci .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#gci .rt{color:var(--dim);font-variant-numeric:tabular-nums;flex:none}
-#gci .warn{color:#ffc848}
-#gci .none{color:var(--dimmer);font-style:italic;padding:3px 0}
-#gci .tot{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
-#gci .kv{background:rgba(255,255,255,.05);border-radius:5px;padding:3px 7px;
-  font-size:10.5px;color:var(--dim)}
+/* The margin tape. Faction, always -- never mission type. */
+.mc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--tape,var(--neutral));transition:width .14s ease}
+.mc:hover::before{width:5px}
+.mc.blue{--tape:var(--blue)}
+.mc.red{--tape:var(--rose)}
 
-/* --- intel toggle -------------------------------------------------------- */
-#intel{position:absolute;top:calc(var(--hdrh) + 10px);right:12px;z-index:640;
-  background:var(--panel2);border:1px solid var(--line);border-radius:7px;
-  padding:6px 12px;font:600 11px/1 ui-sans-serif,system-ui;letter-spacing:.08em;
-  color:var(--dim);cursor:pointer}
-#intel.on{background:rgba(74,158,255,.16);border-color:var(--blue);color:var(--blue);
-  right:322px}
-@media(max-width:820px){#intel.on{right:12px}}
+/* Tasking number. The one place a big mono figure earns its size. */
+.mc .tno{grid-column:1;grid-row:1/3;justify-self:end;
+  font:500 15px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--ink-3);letter-spacing:-.02em}
+.mc:hover .tno{color:var(--ink-2)}
+
+.mc .mid{grid-column:2;grid-row:1;min-width:0}
+.mc .top{display:flex;align-items:center;gap:8px;min-width:0}
+.mc .obj{font:600 13.5px/1.25 var(--ui);color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc .cat{font:500 9px/1 var(--mono);letter-spacing:.14em;padding:3px 6px;
+  border:1px solid var(--rule-2);border-radius:2px;color:var(--ink-3);flex:none}
+.mc .desc{font:400 11.5px/1.45 var(--ui);color:var(--ink-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+
+/* Right-hand data block: fixed columns so the eye runs down, not across. */
+.mc .right{grid-column:3;grid-row:1/3;display:flex;align-items:center;gap:16px;flex:none}
+.mc .thr{display:flex;gap:2px;align-items:center}
+.mc .thr i{width:3px;height:11px;background:var(--rule-2);border-radius:1px}
+.mc .thr i.f{background:var(--amber)}
+.mc .xp{font:500 12px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--ink-2);min-width:52px;text-align:right}
+.mc .aux{font:400 10px/1 var(--mono);color:var(--ink-3);min-width:56px;
+  text-align:right}
+
+/* Active tasking: progress is the point, so it becomes the baseline of the row. */
+.mc.act .bar{grid-column:2/4;grid-row:2;height:2px;background:var(--rule);margin-top:7px;
+  position:relative;overflow:hidden}
+.mc.act .bar i{position:absolute;inset:0 auto 0 0;background:var(--blue)}
+.mc.act.done .bar i{background:var(--jade)}
+.mc .pct{font:500 11px/1 var(--mono);color:var(--ink-2);min-width:38px;text-align:right}
+.mc.act.done .pct{color:var(--jade)}
+
+/* Expiring work is the only thing allowed to use amber in this list. */
+.mc.urgent .aux{color:var(--amber)}
+
+.empty{padding:22px 16px;font:400 12px/1.5 var(--ui);color:var(--ink-3)}
+/* First paint happens before any fetch resolves. An empty screen reads as
+   broken, so say what is happening instead. */
+.boot{padding:40px 20px;text-align:center;color:var(--ink-3);
+  font:400 12px/1.7 var(--ui)}
+.boot b{display:block;font:500 10px/1 var(--mono);letter-spacing:.2em;
+  text-transform:uppercase;color:var(--ink-2);margin-bottom:8px}
+.boot .bars{display:flex;gap:3px;justify-content:center;margin-bottom:14px}
+.boot .bars i{width:3px;height:14px;background:var(--rule-2);
+  animation:boot 1.1s ease-in-out infinite}
+.boot .bars i:nth-child(2){animation-delay:.12s}
+.boot .bars i:nth-child(3){animation-delay:.24s}
+.boot .bars i:nth-child(4){animation-delay:.36s}
+@keyframes boot{0%,100%{background:var(--rule-2)}50%{background:var(--blue)}}
+.empty b{display:block;font:500 11px/1 var(--mono);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-2);margin-bottom:6px}
+
+@media(max-width:1000px){
+  #list{grid-template-columns:1fr}
+  #list .col{border-right:0;border-bottom:1px solid var(--rule-2)}
+}
+@media(max-width:560px){
+  .mc{grid-template-columns:34px 1fr;padding-right:12px}
+  .mc .right{grid-row:2;grid-column:2;justify-content:flex-start;
+    gap:12px;margin-top:5px}
+  .mc.act .bar{grid-row:3}
+  .mc .desc{white-space:normal}
+}
 
 /* --- pilot detail card --------------------------------------------------- */
 .pgrid{display:grid;gap:16px;grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -264,48 +371,350 @@ button{font:inherit;color:inherit;cursor:pointer}
   font-variant-numeric:tabular-nums}
 .tot2 span{display:block;font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;
   color:var(--dimmer);margin-top:3px}
+
+/* Motion communicates state and nothing else. Anyone who has asked their
+   system to stop animating gets a still interface, including the live pulse. */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
+    transition-duration:.001ms!important;scroll-behavior:auto!important}
+  .beat.on{animation:none}
+}
+
+/* ===================== MAP HUD ===================== */
+/* Corners only. The centre of the map is operational surface and stays clear. */
+#hud{position:absolute;inset:var(--hdrh) 0 0 0;z-index:600;pointer-events:none;
+  transition:right .18s ease;
+  display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto 1fr auto;
+  padding:12px;gap:8px}
+#hud > *{pointer-events:auto}
+/* When the workstation is open it owns the right edge; the HUD steps aside. */
+#hud.panelled{right:326px}
+@media(max-width:900px){#hud.panelled{right:0}}
+#hud .tl{grid-area:1/1;justify-self:start;align-self:start}
+#hud .tr{grid-area:1/3;justify-self:end;align-self:start}
+#hud .bl{grid-area:3/1;justify-self:start;align-self:end}
+#hud .br{grid-area:3/3;justify-self:end;align-self:end}
+#hud .bc{grid-area:3/2;justify-self:center;align-self:end}
+
+.hudbox{background:rgba(10,14,20,.86);border:1px solid var(--rule-2);
+  border-radius:var(--r);backdrop-filter:blur(3px)}
+
+/* top-left: what am I looking at */
+.hud-theatre{display:flex;align-items:stretch}
+.hud-theatre .t{padding:7px 11px;font:600 11px/1 var(--ui);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink);border-right:1px solid var(--rule-2)}
+.hud-theatre .z{padding:7px 11px;font:500 11px/1 var(--mono);color:var(--ink-2)}
+
+/* top-right: can I trust this picture */
+.hud-tr{display:flex;gap:8px;align-items:flex-start}
+.feedstate{display:flex;align-items:center;gap:7px;padding:7px 11px;
+  font:500 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.feedstate.live{color:var(--jade)} .feedstate.lag{color:var(--amber)}
+.feedstate.dead{color:var(--rose)}
+
+#intel{padding:7px 13px;font:600 10px/1 var(--mono);letter-spacing:.18em;
+  color:var(--ink-3);background:rgba(10,14,20,.86);
+  border:1px solid var(--rule-2);border-radius:var(--r);
+  transition:color .16s ease,border-color .16s ease,background .16s ease}
+#intel:hover{color:var(--ink-2);border-color:var(--rule-hot)}
+#intel.on{color:var(--ink);border-color:var(--blue);background:rgba(76,143,232,.16)}
+
+/* bottom-left: a map that does not tell you where the cursor is isn't a map */
+.hud-pos{display:flex;align-items:stretch;font:500 11px/1 var(--mono)}
+.hud-pos span{padding:7px 10px;color:var(--ink-2);
+  border-right:1px solid var(--rule-2);font-variant-numeric:tabular-nums}
+.hud-pos span:last-child{border-right:0;color:var(--ink-3)}
+
+/* bottom-right: legend */
+.hud-legend{padding:9px 11px;display:grid;gap:5px;width:max-content}
+.hud-legend div{display:flex;align-items:center;gap:8px;
+  font:400 10px/1 var(--mono);letter-spacing:.09em;color:var(--ink-3);
+  text-transform:uppercase;white-space:nowrap}
+.hud-legend i{width:8px;height:8px;border-radius:50%;flex:none}
+.hud-legend i.sq{border-radius:1px;width:9px;height:9px}
+.hud-legend i.ring{background:none;border:1.5px solid currentColor}
+
+/* the source-and-age line, centred and quiet */
+#mapnote{padding:6px 12px;font:400 10.5px/1 var(--mono);letter-spacing:.05em;
+  color:var(--ink-3);background:rgba(10,14,20,.8);border:1px solid var(--rule);
+  border-radius:var(--r);max-width:min(92vw,760px);text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Leaflet chrome, brought in line with everything else */
+.leaflet-top.leaflet-left{top:46px}
+.leaflet-control-zoom{border:1px solid var(--rule-2)!important;
+  border-radius:var(--r)!important;overflow:hidden;box-shadow:none!important}
+.leaflet-control-zoom a{background:rgba(10,14,20,.9)!important;color:var(--ink-2)!important;
+  border-bottom:1px solid var(--rule-2)!important;width:28px!important;height:28px!important;
+  line-height:27px!important;font-size:15px!important;font-family:var(--mono)!important}
+.leaflet-control-zoom a:hover{background:var(--panel)!important;color:var(--ink)!important}
+.leaflet-control-attribution{background:rgba(10,14,20,.8)!important;
+  font:400 9px/1.5 var(--mono)!important;color:var(--ink-3)!important;
+  border-top-left-radius:var(--r)}
+.leaflet-control-attribution a{color:var(--ink-3)!important}
+.leaflet-popup-content-wrapper{background:var(--panel)!important;color:var(--ink)!important;
+  border:1px solid var(--rule-2)!important;border-radius:var(--r)!important;
+  box-shadow:0 8px 28px rgba(0,0,0,.55)!important}
+.leaflet-popup-content{font:400 12px/1.55 var(--ui)!important;margin:10px 12px!important}
+.leaflet-popup-content b{font:600 12px/1.4 var(--ui)}
+.leaflet-popup-tip{background:var(--panel)!important;border:1px solid var(--rule-2)!important}
+.trk{font:500 9px/1.25 var(--mono);letter-spacing:.06em;text-shadow:0 0 3px #000,0 0 6px #000}
+
+@media(max-width:760px){
+  #hud{padding:8px}
+  .hud-legend,.hud-pos{display:none}
+}
+
+/* ===================== GCI WORKSTATION ===================== */
+#gci{position:absolute;top:var(--hdrh);right:0;bottom:0;width:326px;z-index:620;
+  overflow-y:auto;background:rgba(13,18,26,.96);backdrop-filter:blur(6px);
+  border-left:1px solid var(--rule-2);
+  font:400 12px/1.45 var(--ui)}
+@media(max-width:900px){#gci{display:none!important}}
+
+#gci h3{position:sticky;top:0;z-index:2;margin:0;padding:9px 14px 7px;
+  font:500 9px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink-3);background:rgba(13,18,26,.98);
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+#gci h3:first-child{border-top:0}
+#gci h3 em{font-style:normal;color:var(--ink-2);float:right}
+
+#gci .row{display:flex;justify-content:space-between;gap:10px;
+  padding:5px 14px;line-height:1.35;border-bottom:1px solid rgba(255,255,255,.03)}
+#gci .row:hover{background:rgba(76,143,232,.05)}
+#gci .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+#gci .rt{flex:none;font:500 11px/1.35 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--ink-2)}
+#gci .rt.warn{color:var(--amber)}
+#gci .none{padding:8px 14px;color:var(--ink-3);font-size:11px;font-style:italic}
+
+/* the air-picture summary: three numbers, read at a glance */
+#gci .pic{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--rule)}
+#gci .pic div{padding:9px 6px;text-align:center;border-right:1px solid var(--rule)}
+#gci .pic div:last-child{border-right:0}
+#gci .pic b{display:block;font:600 17px/1 var(--mono);font-variant-numeric:tabular-nums}
+#gci .pic span{display:block;font:500 8.5px/1 var(--mono);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:5px}
+#gci .pic .b b{color:var(--blue)} #gci .pic .r b{color:var(--rose)}
+#gci .pic .n b{color:var(--ink-2)}
+
+#gci .dot{width:6px;height:6px;border-radius:50%;display:inline-block;
+  margin-right:7px;vertical-align:1px}
+
+
+/* ===================== PANEL VIEWS ===================== */
+#panel{height:100%;overflow-y:auto}
+.pnl{max-width:1280px;margin:0 auto;padding:26px 26px 60px}
+.pnl.wide{max-width:1500px}
+.pnl h2{margin:0 0 4px;font:600 15px/1.2 var(--ui);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink)}
+.pnl .sub{font:400 12px/1.6 var(--ui);color:var(--ink-3);max-width:70ch;margin-bottom:20px}
+.pnl .sub b{color:var(--ink-2);font-weight:500}
+
+/* section rule: a label sitting on a hairline, the way a form divides itself */
+.srule{display:flex;align-items:center;gap:12px;margin:26px 0 12px}
+.srule span{font:500 9.5px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink-3);flex:none}
+.srule i{flex:1;height:1px;background:var(--rule)}
+
+/* ---------- squadron totals ---------- */
+/* Sized to content. auto-fit + 1fr stretched four figures across 1500px and
+   turned a summary into four billboards. */
+.tot2{display:inline-grid;grid-auto-flow:column;
+  border:1px solid var(--rule);border-radius:var(--r);overflow:hidden;margin-bottom:6px}
+.tot2 div{padding:11px 20px;border-right:1px solid var(--rule);min-width:96px}
+.tot2 div:last-child{border-right:0}
+.tot2 b{display:block;font:600 20px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--ink)}
+.tot2 span{display:block;font:500 8.5px/1 var(--mono);letter-spacing:.17em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:6px}
+
+.roles{font:400 12px/1.7 var(--ui);color:var(--ink-3);margin-top:10px}
+.roles b{font:500 10px/1 var(--mono);letter-spacing:.15em;color:var(--amber);
+  border:1px solid rgba(232,163,61,.35);border-radius:2px;padding:3px 6px;margin-right:8px}
+
+/* ---------- roster ---------- */
+table.lb{width:100%;border-collapse:collapse;margin-top:6px}
+table.lb thead th{position:sticky;top:0;z-index:2;background:var(--graphite);
+  text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule-2);
+  font:500 9px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;
+  color:var(--ink-3);white-space:nowrap}
+table.lb thead th.r{text-align:right}
+table.lb tr.pr{cursor:pointer;transition:background .14s ease}
+table.lb tr.pr:hover td{background:rgba(76,143,232,.05)}
+table.lb tr.pr.open td{background:rgba(76,143,232,.09)}
+table.lb td{padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:middle}
+table.lb td.r{text-align:right;font-family:var(--mono);
+  font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:12px}
+table.lb td.pos{font:500 12px/1 var(--mono);color:var(--ink-3);width:58px;
+  white-space:nowrap}
+table.lb tr.pr:nth-child(-n+6) td.pos{color:var(--ink-2)}
+
+.cs{display:flex;align-items:center;gap:9px;min-width:0}
+.cs .pav{width:24px;height:24px;border-radius:3px;flex:none;display:grid;
+  place-items:center;font:600 10px/1 var(--mono);
+  background:var(--avb);color:var(--avf);border:1px solid var(--avf)}
+.cs .nmw{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font:500 13px/1.3 var(--ui);color:var(--ink)}
+.caret{display:inline-block;width:8px;color:var(--ink-3);font-size:8px;
+  transition:transform .14s ease}
+tr.pr.open .caret{transform:rotate(90deg);color:var(--blue)}
+
+.badge{font:500 8.5px/1 var(--mono);letter-spacing:.13em;padding:3px 6px;
+  border-radius:2px;border:1px solid transparent;white-space:nowrap}
+.badge.on{background:rgba(69,192,138,.14);color:var(--jade);
+  border-color:rgba(69,192,138,.3)}
+.badge.role{background:rgba(232,163,61,.13);color:var(--amber);
+  border-color:rgba(232,163,61,.32)}
+.badge.cmd{color:var(--ink-2);border-color:var(--rule-2)}
+.badge.sb{color:var(--ink-2);border-color:var(--rule-2)}
+
+/* ---------- expanded pilot record ---------- */
+td.detcell{padding:0!important;background:rgba(10,14,20,.6);
+  border-bottom:1px solid var(--rule-2)!important}
+.pcard{padding:16px 18px 0 56px}
+.phead{display:flex;gap:14px;align-items:flex-start}
+.pname{font:600 15px/1.2 var(--ui);color:var(--ink);margin-bottom:7px}
+.ppills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.pill2{font:500 9.5px/1 var(--mono);letter-spacing:.1em;padding:4px 8px;
+  border:1px solid var(--rule-2);border-radius:2px;color:var(--ink-2)}
+.pill2.b{border-color:rgba(76,143,232,.4);color:var(--blue)}
+.pill2.r{border-color:rgba(217,69,92,.4);color:var(--rose)}
+.pnote{font:400 12px/1.75 var(--ui);color:var(--ink-3);max-width:78ch}
+.pnote b{color:var(--ink-2);font-weight:500}
+.pstats{display:flex;margin:14px -18px 0 -56px;border-top:1px solid var(--rule)}
+.pstats>div{flex:1;padding:11px 10px;text-align:center;border-right:1px solid var(--rule)}
+.pstats>div:last-child{border-right:0}
+.pstats b{display:block;font:600 15px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--ink)}
+.pstats span{display:block;font:500 8.5px/1 var(--mono);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:5px}
+.prank{display:none}
+
+/* ---------- operational log ---------- */
+.tlk{display:flex;gap:18px;margin:0 0 14px;font:400 11px/1 var(--mono);color:var(--ink-3)}
+.tlk i{display:inline-block;width:14px;height:2px;margin-right:7px;vertical-align:3px}
+.tlwrap{border:1px solid var(--rule);border-radius:var(--r);padding:14px 16px 10px;
+  background:var(--slate)}
+.tlwrap svg{width:100%;height:clamp(200px,32vh,320px);display:block}
+.tlx{display:flex;justify-content:space-between;margin-top:9px;
+  font:400 10px/1 var(--mono);color:var(--ink-3)}
+
+.log{border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.le{display:grid;grid-template-columns:62px 92px 1fr;gap:0;align-items:baseline;
+  border-bottom:1px solid var(--rule);transition:background .14s ease}
+.le:last-child{border-bottom:0}
+.le:hover{background:rgba(76,143,232,.045)}
+.le .lt{padding:8px 10px;font:400 10.5px/1.4 var(--mono);color:var(--ink-3);
+  text-align:right;border-right:1px solid var(--rule)}
+.le .lk{padding:8px 10px;font:500 9px/1.4 var(--mono);letter-spacing:.13em;
+  text-transform:uppercase;border-right:1px solid var(--rule)}
+.le .lx{padding:8px 12px;font:400 12px/1.45 var(--ui);color:var(--ink)}
+.le.kill    .lk{color:var(--rose)}
+.le.capture .lk{color:var(--blue)}
+.le.trap    .lk{color:var(--amber)}
+.le.join .lk,.le.leave .lk{color:var(--jade)}
+.le .lk{color:var(--ink-3)}
+
+/* ---------- mission support packages ---------- */
+.req{border:1px solid rgba(232,163,61,.3);border-left:3px solid var(--amber);
+  border-radius:var(--r);background:rgba(232,163,61,.06);padding:12px 15px;
+  font:400 12px/1.65 var(--ui);color:var(--ink-2);margin-bottom:22px}
+.req b{color:var(--amber);font-weight:600}
+.dl{border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.dlc{display:grid;grid-template-columns:1fr 150px 132px;gap:0;align-items:center;
+  border-bottom:1px solid var(--rule);transition:background .14s ease}
+.dlc:last-child{border-bottom:0}
+.dlc:hover{background:rgba(76,143,232,.045)}
+.dlc .meta{padding:12px 16px;min-width:0}
+.dlc .n{font:600 13px/1.3 var(--ui);color:var(--ink)}
+.dlc .d{font:400 11.5px/1.5 var(--ui);color:var(--ink-3);margin-top:3px}
+.dlc .v{padding:12px 14px;font:500 11px/1.3 var(--mono);color:var(--ink-2);
+  border-left:1px solid var(--rule);word-break:break-all}
+.dlc .act{padding:12px 16px;border-left:1px solid var(--rule);text-align:right}
+.dlc .act a{font:500 11px/1 var(--mono);letter-spacing:.09em;color:var(--blue);
+  text-decoration:none;white-space:nowrap}
+.dlc .act a:hover{text-decoration:underline}
+.dlc .ask{font:400 10.5px/1.35 var(--mono);color:var(--ink-3)}
+
+@media(max-width:820px){
+  .pnl{padding:18px 14px 50px}
+  table.lb .hide-s{display:none}
+  .dlc{grid-template-columns:1fr}
+  .dlc .v,.dlc .act{border-left:0;border-top:1px solid var(--rule);text-align:left}
+  .le{grid-template-columns:56px 1fr}
+  .le .lk{grid-column:2;border-right:0;padding-bottom:0}
+  .le .lx{grid-column:2;padding-top:2px}
+  .pcard{padding-left:18px}
+  .pstats{margin-left:-18px}
+}
+
 </style>
 </head>
 <body>
 
-<div id="hdr">
-  <div class="hrow">
-    <div class="brand">
-      <div class="mark">SF</div>
-      <h1>SKYFORGE MISSION BOARD</h1>
-      <span class="ver" id="ver">v1.0</span>
-    </div>
-    <div class="spacer"></div>
-    <div class="hstat">&#128100; <b id="hPlay">0</b> playing</div>
-    <div class="hstat">&#128737; <b id="hZones">0</b> zones held</div>
+<header id="hdr">
+  <div class="masthead">
+    <a class="brand" href="#" aria-label="SkyForge air operations">
+      <!-- Delta planform inside a chevron: reads as an aircraft and as a rank
+           mark at once, and stays legible at favicon size. -->
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M16 2 L30 27 L16 21 L2 27 Z" fill="var(--blue)" opacity=".92"/>
+        <path d="M16 2 L30 27 L16 21 Z" fill="var(--ink)" opacity=".22"/>
+        <path d="M16 21 L16 2" stroke="var(--graphite)" stroke-width="1.1"/>
+      </svg>
+      <span class="wordmark">SKYFORGE</span>
+      <span class="sub">AIR OPS</span>
+    </a>
+    <div id="theatre"></div>
+    <nav id="views" role="tablist" aria-label="Views">
+      <button class="sb on" data-v="list"    role="tab" aria-selected="true">Ops</button>
+      <button class="sb"    data-v="map"     role="tab" aria-selected="false">Map</button>
+      <button class="sb"    data-v="pilots"  role="tab" aria-selected="false">Pilots</button>
+      <button class="sb"    data-v="history" role="tab" aria-selected="false">Log</button>
+      <button class="sb"    data-v="files"   role="tab" aria-selected="false">Files</button>
+    </nav>
   </div>
 
-  <div id="tabs"></div>
-  <div id="strip"></div>
+  <div id="rail"></div>
 
-  <div id="ctl">
-    <span class="lbl">VIEW</span>
-    <div class="seg" id="views">
-      <button class="sb on" data-v="list">List</button>
-      <button class="sb" data-v="map">Map</button>
-      <button class="sb" data-v="pilots">Pilots</button>
-      <button class="sb" data-v="history">History</button>
-      <button class="sb" data-v="files">Files</button>
-    </div>
-    <span class="lbl" style="margin-left:8px">CATEGORY</span>
-    <div class="seg" id="cats"></div>
-    <div class="spacer"></div>
-    <span class="meta" id="upd">—</span>
+  <div id="filters">
+    <span class="eyebrow">Tasking filter</span>
+    <div id="cats"></div>
+    <span id="upd"></span>
   </div>
-</div>
+</header>
 
 <div id="main">
-  <div id="list"></div>
+  <div id="list"><div class="boot">
+    <div class="bars"><i></i><i></i><i></i><i></i></div>
+    <b>Contacting SkyForge</b>
+    Reading campaign state, roster and the live picture.
+  </div></div>
   <div id="map" style="display:none"></div>
   <div id="panel" style="display:none"></div>
-  <button id="intel" style="display:none" title="Contact labels and the controller panel">INTEL</button>
+  <div id="hud" style="display:none" aria-hidden="true">
+    <div class="tl hudbox hud-theatre">
+      <span class="t" id="hudTheatre">Caucasus</span>
+      <span class="z" id="hudZones">--</span>
+    </div>
+    <div class="tr hud-tr">
+      <div class="hudbox feedstate" id="feedState"><span class="beat"></span><span>--</span></div>
+      <button id="intel" title="Contact labels and the controller panel"
+              aria-pressed="false">INTEL</button>
+    </div>
+    <div class="bl hudbox hud-pos">
+      <span id="hudLL">--.----  --.----</span><span id="hudZ">z--</span>
+    </div>
+    <div class="bc" id="mapnote"></div>
+    <div class="br hudbox hud-legend">
+      <div><i style="background:var(--blue)"></i>Friendly</div>
+      <div><i style="background:var(--rose)"></i>Hostile</div>
+      <div><i class="sq" style="background:var(--amber)"></i>Awaiting pickup</div>
+      <div><i class="ring" style="color:var(--ink-2)"></i>Contested zone</div>
+    </div>
+  </div>
   <div id="gci" style="display:none"></div>
-  <div id="mapnote"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -370,6 +779,18 @@ const el = (t,c,h) => { const e=document.createElement(t); if(c)e.className=c;
 
 // --- map -------------------------------------------------------------------
 const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([42.6,42.0],7);
+
+// Cursor position and zoom, the way any real chart tool reports them. Written
+// straight to textContent on mousemove -- no re-render, no layout thrash.
+if(map.on){
+  const fmt = (v,pos,neg) => `${Math.abs(v).toFixed(4)}\u00b0${v>=0?pos:neg}`;
+  map.on('mousemove', e => {
+    const n = $('#hudLL');
+    if(n) n.textContent = `${fmt(e.latlng.lat,'N','S')}  ${fmt(e.latlng.lng,'E','W')}`;
+  });
+  const zoomOut = () => { const n=$('#hudZ'); if(n) n.textContent = 'z'+map.getZoom(); };
+  map.on('zoomend', zoomOut); map.on('load', zoomOut);
+}
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
   {attribution:'&copy; OSM &copy; CARTO',subdomains:'abcd',maxZoom:18}).addTo(map);
 const gZones=L.layerGroup().addTo(map), gUnits=L.layerGroup().addTo(map),
@@ -487,18 +908,37 @@ function missions(){
 }
 
 // --- render ----------------------------------------------------------------
-function card(m, isActive){
-  const c=el('div','mc '+m.cat);
-  c.innerHTML=`<div class="mc-top">
-      <span class="mid">#${String(m.id).slice(0,16)}</span>
-      <span class="cat ${m.cat}">${m.cat.toUpperCase()}</span>
-      <span class="stars">${stars(m.diff)}</span></div>
-    <div class="zone"><span class="dot" style="background:${SIDE[m.side]}"></span>${m.zone}</div>
-    <div class="desc">${m.desc}</div>
-    ${isActive?`<div class="prog"><i style="width:${m.prog}%"></i></div>`:''}
-    <div class="mc-foot"><span class="xp">+${m.xp} XP</span>
-      <span class="meta">${isActive?m.prog.toFixed(0)+'%':
-        m.timer?'expires '+mmss(m.timer): m.res?Math.round(m.res/1000)+'k res':''}</span></div>`;
+function card(m, isActive, lineNo){
+  const c=el('div','mc '+(m.side===1?'red':m.side===2?'blue':'')+(isActive?' act':''));
+  const pct = isActive ? Math.max(0,Math.min(100,m.prog||0)) : 0;
+  if(isActive && pct>=100) c.classList.add('done');
+
+  // Threat as four ticks rather than stars: stars read as a rating, and this
+  // is a threat assessment. Filled ticks are amber because threat is the one
+  // thing in this list that warrants attention colour.
+  const thr=[0,1,2,3].map(i=>`<i class="${i<(m.diff||0)?'f':''}"></i>`).join('');
+
+  // Right-hand block, fixed order so it lines up down the column.
+  const aux = m.timer ? `<span class="aux">${mmss(m.timer)}</span>`
+            : m.res   ? `<span class="aux">${Math.round(m.res/1000)}k res</span>`
+            : '<span class="aux"></span>';
+  if(m.timer && m.timer < 600) c.classList.add('urgent');
+
+  c.innerHTML=`
+    <span class="tno">${String(lineNo).padStart(3,'0')}</span>
+    <div class="mid">
+      <div class="top">
+        <span class="cat">${esc(m.cat.toUpperCase())}</span>
+        <span class="obj">${esc(m.zone)}</span>
+      </div>
+      <div class="desc">${esc(m.desc)}</div>
+    </div>
+    <div class="right">
+      <span class="thr" title="Threat ${m.diff||0} of 4">${thr}</span>
+      <span class="xp">+${m.xp} XP</span>
+      ${isActive ? `<span class="pct">${pct.toFixed(0)}%</span>` : aux}
+    </div>
+    ${isActive ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ''}`;
   return c;
 }
 
@@ -506,15 +946,27 @@ function renderList(){
   const {avail,act}=missions();
   const a=avail.filter(m=>active.has(m.cat)), b=act.filter(m=>active.has(m.cat));
   const L=$('#list'); L.innerHTML='';
-  const mk=(title,arr,isAct)=>{
+
+  const mk=(title,arr,isAct,emptyMsg)=>{
     const col=el('div','col');
-    col.appendChild(el('h3',null,`${title} <span>${arr.length}</span>`));
-    if(!arr.length) col.appendChild(el('div','empty','nothing here'));
-    arr.forEach(m=>col.appendChild(card(m,isAct)));
+    const h=el('div','colhead');
+    h.innerHTML=`<h3>${title}</h3><span class="n">${String(arr.length).padStart(2,'0')}</span>
+                 <span class="rule"></span>`;
+    col.appendChild(h);
+    if(!arr.length){
+      // An empty column should say what would fill it, not just sit blank.
+      col.appendChild(el('div','empty',
+        `<b>No ${title.toLowerCase()} tasking</b>${emptyMsg}`));
+    }
+    arr.forEach((m,i)=>col.appendChild(card(m,isAct,i+1)));
     return col;
   };
-  L.appendChild(mk('AVAILABLE',a,false));
-  L.appendChild(mk('ACTIVE',b,true));
+
+  L.appendChild(mk('Available',a,false,
+    active.size<CATS.length ? 'Some categories are filtered out.'
+                            : 'Pretense generates tasking as the front moves.'));
+  L.appendChild(mk('Active',b,true,
+    'Nothing is being built right now.'));
 }
 
 function renderMap(gci){
@@ -653,80 +1105,109 @@ function renderGci(){
   if(!c){ el.innerHTML='<div class="none">No campaign data.</div>'; return; }
 
   const zones=Object.values(c.zones||{});
-  const blue=zones.filter(z=>z.side===2).length, red=zones.filter(z=>z.side===1).length;
+  const blue=zones.filter(z=>z.side===2).length;
+  const red=zones.filter(z=>z.side===1).length;
+  const neutral=zones.filter(z=>z.side===0).length;
 
-  const rows=(arr,empty)=>arr.length
-    ? arr.join('')
-    : `<div class="none">${empty}</div>`;
+  const rows=(arr,empty)=>arr.length?arr.join(''):`<div class="none">${empty}</div>`;
+  const sect=(t,n)=>`<h3>${t}${n!==undefined?`<em>${n}</em>`:''}</h3>`;
 
-  // Priority objectives the campaign itself has nominated.
   const pri=Object.values((c.battlefieldManager&&c.battlefieldManager.priorityZones)||{});
   const ovr=(c.battlefieldManager&&c.battlefieldManager.overridePriorityZones)||[];
   const priList=[...ovr,...pri].filter(Boolean);
 
-  // Contested = adjacent to the front. Sorted by how exposed they are.
   const front=zones.filter(z=>(z.distToFront??9)<=1)
     .sort((a,b)=>(a.closestEnemyDist||0)-(b.closestEnemyDist||0));
 
   const air=Object.values(c.activeGroups||{}).filter(g=>(g.position&&g.position.y||0)>150);
   const byType={};
   air.forEach(g=>{ const t=(g.type||'other'); byType[t]=(byType[t]||0)+1; });
+  const airBlue=air.filter(g=>/-blue(-|$)/.test(g.productName||'')).length;
+  const airRed=air.filter(g=>/-red(-|$)/.test(g.productName||'')).length;
 
   const csar=Object.values(c.csarTracker||{}).sort((a,b)=>a.remainingTime-b.remainingTime);
   const squads=Object.values(c.squadTracker||{}).filter(q=>q.state==='extractReady')
     .sort((a,b)=>a.remainingStateTime-b.remainingStateTime);
   const carriers=Object.values(c.carriers||{});
+  const srs=(D.live&&D.live.env&&D.live.env.srs)||[];
 
   el.innerHTML=`
-    <h3>Front</h3>
-    <div class="tot">
-      <span class="kv" style="color:var(--blue)">BLUE ${blue}</span>
-      <span class="kv" style="color:var(--red)">RED ${red}</span>
-      <span class="kv">${air.length} airborne</span>
+    <div class="pic">
+      <div class="b"><b>${airBlue}</b><span>Friendly</span></div>
+      <div class="r"><b>${airRed}</b><span>Hostile</span></div>
+      <div class="n"><b>${air.length-airBlue-airRed}</b><span>Unknown</span></div>
     </div>
 
-    <h3>Priority objectives</h3>
+    ${sect('Territory')}
+    <div class="row"><span class="nm">
+      <span class="dot" style="background:var(--blue)"></span>Blue held</span>
+      <span class="rt">${blue}</span></div>
+    <div class="row"><span class="nm">
+      <span class="dot" style="background:var(--rose)"></span>Red held</span>
+      <span class="rt">${red}</span></div>
+    <div class="row"><span class="nm">
+      <span class="dot" style="background:var(--neutral)"></span>Neutral</span>
+      <span class="rt">${neutral}</span></div>
+
+    ${sect('Priority objectives')}
     ${rows(priList.map(n=>`<div class="row"><span class="nm">${esc(n)}</span></div>`),
-           'none nominated')}
+           'None nominated')}
 
-    <h3>Contested (${front.length})</h3>
+    ${sect('Contested', front.length)}
     ${rows(front.map(z=>`<div class="row">
-        <span class="nm"><span class="dot" style="background:${SIDE[z.side]}"></span>
-          ${esc(z.name)}</span>
+        <span class="nm"><span class="dot" style="background:${SIDE[z.side]}"></span>${esc(z.name)}</span>
         <span class="rt">${Math.round((z.closestEnemyDist||0)/1000)} km</span></div>`),
-        'front is quiet')}
+        'Front is quiet')}
 
-    <h3>Air activity</h3>
+    ${sect('Air activity', air.length)}
     ${rows(Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([t,n])=>
         `<div class="row"><span class="nm">${esc(t.replace(/_/g,' '))}</span>
-         <span class="rt">${n}</span></div>`), 'nothing airborne')}
+         <span class="rt">${n}</span></div>`), 'Nothing airborne')}
 
-    <h3>CSAR (${csar.length})</h3>
-    ${rows(csar.map(p=>`<div class="row">
-        <span class="nm">${esc(p.name)}</span>
+    ${sect('On the radio', srs.length)}
+    ${rows(srs.map(x=>`<div class="row"><span class="nm">${esc(x.n)}</span>
+        <span class="rt">${x.f?(x.f/1e6).toFixed(3):''}</span></div>`), 'No SRS clients')}
+
+    ${sect('CSAR', csar.length)}
+    ${rows(csar.map(p=>`<div class="row"><span class="nm">${esc(p.name)}</span>
         <span class="rt ${p.remainingTime<600?'warn':''}">${mmss(p.remainingTime)}</span>
-      </div>`), 'no downed pilots')}
+      </div>`), 'No downed pilots')}
 
-    <h3>Awaiting extraction (${squads.length})</h3>
+    ${sect('Awaiting pickup', squads.length)}
     ${rows(squads.map(q=>`<div class="row">
         <span class="nm">${esc(q.type||'squad')} &middot; ${esc(q.name)}</span>
         <span class="rt ${q.remainingStateTime<600?'warn':''}">${mmss(q.remainingStateTime)}</span>
-      </div>`), 'none waiting')}
+      </div>`), 'None waiting')}
 
-    <h3>On the radio</h3>
-    ${rows(((D.live&&D.live.env&&D.live.env.srs)||[]).map(c=>`<div class="row">
-        <span class="nm">${esc(c.n)}</span>
-        <span class="rt">${c.f?(c.f/1e6).toFixed(3)+' MHz':''}</span></div>`),
-        'no SRS clients')}
+    ${sect('Naval')}
+    ${rows(carriers.map(cv=>`<div class="row"><span class="nm">${esc(cv.name)}</span>
+        <span class="rt">${Math.round((cv.resource||0)/1000)}k</span></div>`), 'No carriers')}
 
-    <h3>Recent activity</h3>
-    <div class="feed">${feedRows(12)}</div>
+    ${sect('Recent activity')}
+    <div class="feed">${feedRows(14)}</div>`;
+}
 
-    <h3>Naval</h3>
-    ${rows(carriers.map(cv=>`<div class="row">
-        <span class="nm">${esc(cv.name)}</span>
-        <span class="rt">${Math.round((cv.resource||0)/1000)}k</span></div>`),
-        'no carriers')}`;
+// The HUD corners. Kept separate from mapNote() so the trust indicator can
+// update on every poll without touching the source line.
+function renderHud(){
+  const z = Object.keys((D.zones&&D.zones.zones)||{}).length;
+  const c = D.campaign, zs = Object.values((c&&c.zones)||{});
+  const t = $('#hudTheatre'); if(t) t.textContent = (D.zones&&D.zones.theatre)||'Caucasus';
+  const zz = $('#hudZones');
+  if(zz) zz.textContent = zs.length ? `${zs.length} zones \u00b7 ${z} mapped` : `${z} mapped`;
+
+  // Three states, because "live" and "a minute old" are different promises.
+  // Player positions are real-time via gRPC; AI positions come from the
+  // campaign save and are up to a minute behind. Saying so is the point.
+  const st = D.status, age = st ? Date.now()/1000 - st.ts : 1e9;
+  const on = st && st.online && age < STALE;
+  const fs = $('#feedState');
+  if(fs){
+    const cls = !on ? 'dead' : age > 60 ? 'lag' : 'live';
+    const txt = !on ? 'No feed' : age > 60 ? `Lagging ${ago(age)}` : 'Live';
+    fs.className = `hudbox feedstate ${cls}`;
+    fs.innerHTML = `<span class="beat ${on?'on':'off'}"></span><span>${txt}</span>`;
+  }
 }
 
 // A map should say what it is showing, rather than leaving gaps to be guessed at.
@@ -752,22 +1233,36 @@ function mapNote(){
   const el=$('#mapnote'); if(el) el.textContent=bits.join('  \u00b7  ');
 }
 
-// Weather and the mission clock exist only because DCS-gRPC is running. When
-// it is not, these chips are omitted rather than shown empty -- a blank
-// temperature reads as "0 degrees", which is a lie.
+// Weather as a pilot actually reads it: one instrument line, not four widgets.
+//
+//   230908Z 18000KT 17C Q1001
+//
+// Wind is converted to knots because that is the unit on every kneeboard and
+// every ATIS; DCS reports metres per second. Calm renders 00000KT, which is
+// the real notation -- a pilot reads that instantly and it beats inventing a
+// word for it. Values DCS does not supply are omitted rather than zeroed: a
+// blank temperature shown as 0C is a lie, and this is flight data.
 function envChips(){
   const e = D.live && D.live.env;
   if(!e) return '';
+
+  const p2 = n => String(n).padStart(2,'0');
+  const p3 = n => String(n).padStart(3,'0');
   const bits = [];
-  const hh = String(e.hh ?? 0).padStart(2,'0'), mm = String(e.mm ?? 0).padStart(2,'0');
-  bits.push(`<div class="chip" title="Mission time, not wall clock">&#128336; <b>${hh}:${mm}</b></div>`);
-  if(e.tempC !== null && e.tempC !== undefined)
-    bits.push(`<div class="chip">&#127777; <b>${e.tempC}&deg;C</b></div>`);
-  if(e.qnh) bits.push(`<div class="chip" title="QNH">&#127756; <b>${e.qnh}</b> hPa</div>`);
-  // proto3 omits zero values, so absent wind speed means calm, not unknown.
-  bits.push(`<div class="chip" title="Surface wind">&#127788; <b>${
-    e.windMs ? `${String(e.windDir).padStart(3,'0')}&deg; / ${e.windMs} m/s` : 'calm'}</b></div>`);
-  return bits.join('\n    ');
+
+  // Day-of-month + mission time, Zulu. The Z is not decoration -- mission time
+  // is what briefings are written against, and it is not the wall clock.
+  if(e.day) bits.push(`<b>${p2(e.day)}${p2(e.hh??0)}${p2(e.mm??0)}Z</b>`);
+  else      bits.push(`<b>${p2(e.hh??0)}${p2(e.mm??0)}Z</b>`);
+
+  const kt = Math.round((e.windMs||0) * 1.94384);
+  bits.push(`<b>${p3(e.windDir||0)}${p2(kt)}KT</b>`);
+
+  if(e.tempC !== null && e.tempC !== undefined) bits.push(`<b>${Math.round(e.tempC)}C</b>`);
+  if(e.qnh) bits.push(`<b>Q${e.qnh}</b>`);
+
+  return `<div class="cell metar" title="Mission time (Zulu), surface wind, temperature, QNH">
+    ${bits.join(' ')}</div>`;
 }
 
 function renderHeader(){
@@ -777,25 +1272,41 @@ function renderHeader(){
   const blue=zones.filter(z=>z.side===2).length, red=zones.filter(z=>z.side===1).length;
   const {avail,act}=missions();
 
-  $('#hPlay').textContent=on?(s.players||0):0;
-  $('#hZones').textContent=`${blue}/${blue+red}`;
-
-  $('#tabs').innerHTML=`<div class="tab on">
-      <span class="dot ${on?'on':'off'}"></span>
-      <span><div class="nm">Caucasus</div><div class="era">PRETENSE · MODERN</div></span>
-      <span class="pill av">${avail.length}</span><span class="pill ac">${act.length}</span>
+  // Theatre: the campaign's identity, with the two counts a pilot scans for.
+  $('#theatre').innerHTML=`
+    <div>
+      <div class="tname">${esc((D.zones&&D.zones.theatre)||'Caucasus')}</div>
+      <div class="tmeta">Pretense &middot; persistent</div>
+    </div>
+    <div class="tally" title="${avail.length} available, ${act.length} active">
+      <b>${avail.length}</b><b>${act.length}</b>
     </div>`;
 
-  $('#strip').innerHTML=`
-    <div class="chip"><span class="dot ${on?'on':'off'}"></span>
-      <b>${on?'RUNNING':'OFFLINE'}</b>${on?'':' · '+ago(age)+' ago'}</div>
-    <div class="chip">&#128100; <b>${on?s.players:0}</b> pilots</div>
-    <div class="chip">&#9889; <b>${on?s.fps:'—'}</b> sim FPS</div>
-    <div class="chip" style="color:var(--blue)">BLUE <b>${blue}</b></div>
-    <div class="chip" style="color:var(--red)">RED <b>${red}</b></div>
+  // Telemetry rail. Ordered by what needs answering first: is it up, who is on,
+  // is it healthy, who holds what, what is the weather, where do I connect.
+  const cell=(cls,k,v,extra='')=>
+    `<div class="cell ${cls}" ${extra}><span class="k">${k}</span><span class="v">${v}</span></div>`;
+
+  $('#rail').innerHTML=`
+    <div class="cell state ${on?'on':'off'}">
+      <span class="beat ${on?'on':'off'}"></span>
+      <span class="v">${on?'ON STATION':'OFFLINE'}</span>
+      ${on?'':`<span class="k">${ago(age)} ago</span>`}
+    </div>
+    ${cell('','Pilots', on?(s.players||0):0)}
+    ${cell('','Sim', on?`${s.fps}<span class="k" style="margin-left:4px">fps</span>`:'--')}
+    ${cell('blue','Blue', blue)}
+    ${cell('rose','Red', red)}
     ${envChips()}
-    <div class="chip" title="click to copy">&#128225; <b id="cp">${s?s.address:'—'}</b></div>`;
-  const cp=$('#cp'); if(cp&&s) cp.parentElement.onclick=()=>navigator.clipboard.writeText(s.address);
+    <div class="cell grow"></div>
+    ${cell('addr','Server', s?esc(s.address):'--','id="cp" title="Copy address"')}`;
+
+  const cp=$('#cp');
+  if(cp&&s) cp.onclick=()=>{
+    navigator.clipboard.writeText(s.address);
+    const v=cp.querySelector('.v'), t=v.textContent;
+    v.textContent='COPIED'; setTimeout(()=>{v.textContent=t;},1100);
+  };
 }
 
 // The floating header is not a fixed height. It grows with content (mission
@@ -961,21 +1472,72 @@ function pilotCard(r, pos, count, total, leader){
 function renderPilots(){
   const rows=pilotRows();
   if(!rows.length){ $('#panel').innerHTML=
-    '<div class="pnl"><h2>Pilot roster</h2><div class="empty">No pilot stats yet.</div></div>';
+    `<div class="pnl"><h2>Squadron roster</h2>
+     <div class="empty"><b>No roster yet</b>Pretense writes pilot records the first
+     time someone flies. Nothing has been logged on this campaign.</div></div>`;
     return; }
   const tot=rows.reduce((a,r)=>a+r.xp,0);
 
+  const th=(t,cls='')=>`<th class="${cls}">${t}</th>`;
+
   $('#panel').innerHTML=`<div class="pnl wide">
-    <h2>Pilot roster</h2>
-    <div class="sub">${rows.length} pilots &middot; ${tot.toLocaleString()} XP earned on this campaign.
-      XP comes from Pretense; it carries across sessions and is never reset by a restart.</div>
+    <h2>Squadron roster</h2>
+    <div class="sub">${rows.length} pilots &middot; <b>${tot.toLocaleString()} XP</b> on this
+      campaign. XP carries across sessions and survives a restart.
+      Select a callsign for the full record.</div>
     ${squadronTotals(rows)}
     ${rows.filter(r=>r.role).map(r=>`<div class="roles">
-       <b>${esc(r.role.tag)}</b> &mdash; ${esc(r.name)} &middot; ${esc(r.role.title)}</div>`).join('')}
-    <div class="pgrid">
-      ${rows.map((r,i)=>pilotCard(r, i+1, rows.length, tot, rows[0].xp)).join('')}
-    </div>
-  </div>`;
+       <b>${esc(r.role.tag)}</b>${esc(r.name)} &middot; ${esc(r.role.title)}</div>`).join('')}
+
+    <div class="srule"><span>Roster</span><i></i></div>
+    <table class="lb"><thead><tr>
+      ${th('')}${th('Callsign')}${th('Status','hide-s')}
+      ${th('Sorties','r hide-s')}${th('Kills','r')}${th('Losses','r hide-s')}
+      ${th('Flown','r hide-s')}${th('XP','r')}
+    </tr></thead><tbody>
+    ${rows.map((r,i)=>{
+      const av=avatar(r.name), sn=(D.seen||{})[r.name];
+      const kd=r.kd, cb=r.cb;
+      return `<tr class="pr" data-p="${i}" tabindex="0" role="button"
+                  aria-expanded="false" aria-label="Record for ${esc(r.name)}">
+        <td class="pos"><span class="caret">&#9656;</span> ${i+1}</td>
+        <td><div class="cs">
+          <span class="pav" style="--avb:${av.bg};--avf:${av.fg}">${esc(av.initials)}</span>
+          <span class="nmw">${esc(r.name)}</span>
+          ${r.role?`<span class="badge role">${esc(r.role.tag)}</span>`:''}
+        </div></td>
+        <td class="hide-s">${r.on
+          ? `<span class="badge on">FLYING</span>${r.unit?` <span class="pill2">${esc(r.unit)}</span>`:''}`
+          : `<span style="color:var(--ink-3);font:400 11px var(--mono)">${
+              sn&&sn.last?ago(Date.now()/1000-sn.last)+' ago':'--'}</span>`}</td>
+        <td class="r hide-s">${cb?cb.sorties||0:'--'}</td>
+        <td class="r">${kd&&kd.kills?kd.kills:'--'}</td>
+        <td class="r hide-s">${cb?cb.deaths||0:'--'}</td>
+        <td class="r hide-s">${sn&&sn.minutes>=1?flown(sn.minutes):'--'}</td>
+        <td class="r" style="color:var(--ink)">${r.xp.toLocaleString()}</td>
+      </tr>
+      <tr class="det" data-d="${i}" style="display:none">
+        <td class="detcell" colspan="8">${pilotCard(r,i+1,rows.length,tot,rows[0].xp)}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div>`;
+
+  // Accordion. Keyboard reachable, because a roster you cannot tab through is
+  // not a roster.
+  const open=(tr)=>{
+    const i=tr.dataset.p;
+    const det=$('#panel').querySelector(`tr.det[data-d="${i}"]`);
+    const isOpen=det.style.display!=='none';
+    $('#panel').querySelectorAll('tr.det').forEach(d=>d.style.display='none');
+    $('#panel').querySelectorAll('tr.pr').forEach(p=>{
+      p.classList.remove('open'); p.setAttribute('aria-expanded','false'); });
+    if(!isOpen){ det.style.display=''; tr.classList.add('open');
+                 tr.setAttribute('aria-expanded','true'); }
+  };
+  $('#panel').querySelectorAll('tr.pr').forEach(tr=>{
+    tr.onclick=()=>open(tr);
+    tr.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(tr); } };
+  });
 }
 
 // --- Campaign history -------------------------------------------------------
@@ -986,47 +1548,61 @@ function renderPilots(){
 
 function renderHistory(){
   const h=(D.history||[]).filter(p=>p&&p.t&&(p.b+p.r)>0);
-  if(h.length<2){ $('#panel').innerHTML=
-    `<div class="pnl"><h2>Campaign history</h2>
-     <div class="empty">Not enough history yet &mdash; the front line is sampled every 10 minutes while the server runs.
-     ${h.length?'1 point so far.':''}</div></div>`;
-    return; }
+  const feed=(D.feed&&D.feed.feed)||[];
 
-  const W=1000, H=200, PAD=4;
-  const t0=h[0].t, t1=h[h.length-1].t, span=Math.max(1,t1-t0);
-  const x=p=>((p.t-t0)/span)*W;
-  const maxZ=Math.max(...h.map(p=>p.b+p.r),1);
-  const yy=v=>H-PAD-(v/maxZ)*(H-PAD*2);
+  const chart = h.length<2
+    ? `<div class="empty"><b>Not enough history</b>The front line is sampled every
+       10 minutes while the server runs.${h.length?' One sample so far.':''}</div>`
+    : (()=>{
+        const W=1000,H=200,PAD=4;
+        const t0=h[0].t,t1=h[h.length-1].t,span=Math.max(1,t1-t0);
+        const x=p=>((p.t-t0)/span)*W;
+        const maxZ=Math.max(...h.map(p=>p.b+p.r),1);
+        const yy=v=>H-PAD-(v/maxZ)*(H-PAD*2);
+        const line=h.map((p,i)=>`${i?'L':'M'}${x(p).toFixed(1)},${yy(p.b).toFixed(1)}`).join('');
+        const area=`${line}L${W},${H}L0,${H}Z`;
+        const rline=h.map((p,i)=>`${i?'L':'M'}${x(p).toFixed(1)},${yy(p.r).toFixed(1)}`).join('');
+        const first=h[0],last=h[h.length-1],delta=last.b-first.b;
+        const dtxt=delta>0?`+${delta} zones to blue`:delta<0?`${delta} zones to blue`:'no net change';
+        return `<div class="sub">${h.length} samples over ${ago(t1-t0)} &middot;
+            <b>${dtxt}</b> in that window.</div>
+          <div class="tlk">
+            <span><i style="background:var(--blue)"></i>Blue held</span>
+            <span><i style="background:var(--rose)"></i>Red held</span>
+          </div>
+          <div class="tlwrap">
+            <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+                 aria-label="Zones held over time">
+              <path d="${area}" fill="var(--blue)" opacity=".13"/>
+              <path d="${line}" fill="none" stroke="var(--blue)" stroke-width="2"
+                    vector-effect="non-scaling-stroke"/>
+              <path d="${rline}" fill="none" stroke="var(--rose)" stroke-width="2"
+                    stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <div class="tlx">
+              <span>${new Date(t0*1000).toLocaleString()}</span>
+              <span>${last.b} blue &middot; ${last.r} red</span>
+              <span>${new Date(t1*1000).toLocaleString()}</span>
+            </div>
+          </div>`;
+      })();
 
-  const line=h.map((p,i)=>`${i?'L':'M'}${x(p).toFixed(1)},${yy(p.b).toFixed(1)}`).join('');
-  const area=`${line}L${W},${H}L0,${H}Z`;
-  const rline=h.map((p,i)=>`${i?'L':'M'}${x(p).toFixed(1)},${yy(p.r).toFixed(1)}`).join('');
+  const log = feed.length
+    ? `<div class="log">${feed.slice(0,50).map(e=>`<div class="le ${esc(e.k)}">
+         <span class="lt">${ago(Date.now()/1000-e.ts)}</span>
+         <span class="lk">${esc(String(e.k).toUpperCase())}</span>
+         <span class="lx">${esc(e.t)}</span></div>`).join('')}</div>`
+    : `<div class="empty"><b>No events recorded</b>Kills, zone captures, carrier
+       traps and connections appear here as they happen. The stream starts when
+       the server does.</div>`;
 
-  const first=h[0], last=h[h.length-1];
-  const delta=last.b-first.b;
-  const dtxt = delta>0?`+${delta} zones to BLUE`:delta<0?`${delta} zones to BLUE`:'no net change';
-
-  $('#panel').innerHTML=`<div class="pnl">
-    <h2>Campaign history</h2>
-    <div class="sub">${h.length} samples over ${ago(t1-t0)} &middot; <b>${dtxt}</b> in that window.</div>
-    <div class="tlk">
-      <span><i style="background:var(--blue)"></i>Blue zones</span>
-      <span><i style="background:var(--red)"></i>Red zones</span>
-    </div>
-    <div class="tlwrap">
-      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-        <path d="${area}" fill="var(--blue)" opacity=".14"/>
-        <path d="${line}" fill="none" stroke="var(--blue)" stroke-width="2"
-              vector-effect="non-scaling-stroke"/>
-        <path d="${rline}" fill="none" stroke="var(--red)" stroke-width="2"
-              stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
-      </svg>
-      <div class="tlx">
-        <span>${new Date(t0*1000).toLocaleString()}</span>
-        <span>${last.b} blue &middot; ${last.r} red</span>
-        <span>${new Date(t1*1000).toLocaleString()}</span>
-      </div>
-    </div></div>`;
+  $('#panel').innerHTML=`<div class="pnl wide">
+    <h2>Operations log</h2>
+    <div class="srule"><span>Front line</span><i></i></div>
+    ${chart}
+    <div class="srule"><span>Events</span><i></i></div>
+    ${log}
+  </div>`;
 }
 
 // --- Files ------------------------------------------------------------------
@@ -1055,23 +1631,35 @@ const FILES=[
 
 function renderFiles(){
   $('#panel').innerHTML=`<div class="pnl">
-    <h2>Files &amp; versions</h2>
-    <div class="req"><b>Versions must match the server exactly.</b>
-      A mod aircraft you have on a different build simply will not appear in your
-      spawn list &mdash; there is no error message. If an airframe is missing, check
-      the version here first.</div>
+    <h2>Mission support</h2>
+    <div class="sub">Everything a pilot needs installed to fly here, with the exact
+      build the server runs.</div>
+    <div class="req"><b>Versions must match exactly.</b>
+      A mod aircraft on a different build will not appear in your spawn list, and
+      there is no error message. If an airframe is missing, check the version here first.</div>
+    <div class="srule"><span>Required packages</span><i></i></div>
     <div class="dl">
       ${FILES.map(f=>`<div class="dlc">
-        <div class="n">${esc(f.n)}</div>
+        <div class="meta">
+          <div class="n">${esc(f.n)}</div>
+          <div class="d">${f.d}</div>
+        </div>
         <div class="v">${esc(f.v)}</div>
-        <div class="d">${f.d}</div>
-        <div style="margin-top:10px">${f.src
+        <div class="act">${f.src
           ? `<a href="${f.src}" target="_blank" rel="noopener noreferrer">Download &rarr;</a>`
-          : '<span class="ask">Ask in Discord for the download link</span>'}</div>
+          : '<span class="ask">Ask in Discord<br>for the link</span>'}</div>
       </div>`).join('')}
     </div>
-    <div class="sub" style="margin-top:20px">Server <b>${D.status?esc(D.status.address):'—'}</b>
-      &middot; SRS <b>${D.status&&D.status.srs?esc(D.status.srs):'—'}</b></div>
+    <div class="srule"><span>Connection</span><i></i></div>
+    <div class="dl">
+      <div class="dlc"><div class="meta"><div class="n">Game server</div>
+        <div class="d">Multiplayer &rarr; Connect by IP</div></div>
+        <div class="v">${D.status?esc(D.status.address):'--'}</div><div class="act"></div></div>
+      <div class="dlc"><div class="meta"><div class="n">SRS voice</div>
+        <div class="d">Auto-connects when you join</div></div>
+        <div class="v">${D.status&&D.status.srs?esc(D.status.srs):'--'}</div>
+        <div class="act"></div></div>
+    </div>
   </div>`;
 }
 
@@ -1086,24 +1674,30 @@ function draw(){
   $('#map').style.display   = isMap  ?'block':'none';
   $('#panel').style.display = isPanel?'block':'none';
 
-  // The category filter only means anything against mission cards.
-  $('#cats').style.display = isList?'flex':'none';
-  $('#cats').previousElementSibling.style.display = isList?'':'none';
+  // The whole filter bar belongs to Ops. Leaving an empty strip on Map or
+  // Pilots was 38px of chrome that answered nothing.
+  $('#filters').style.display = isList?'flex':'none';
 
-  $('#mapnote').style.display  = isMap?'block':'none';
-  $('#intel').style.display    = isMap?'block':'none';
+  $('#hud').style.display      = isMap?'grid':'none';
+  $('#hud').setAttribute('aria-hidden', isMap?'false':'true');
   $('#gci').style.display      = (isMap&&intel)?'block':'none';
+  $('#hud').classList.toggle('panelled', isMap&&intel);
   $('#intel').classList.toggle('on', intel);
+  $('#intel').setAttribute('aria-pressed', intel?'true':'false');
 
   if(isList) renderList();
   else if(isPanel) PANELS[view]();
-  else { map.invalidateSize(); renderMap(intel); mapNote();
+  else { map.invalidateSize(); renderMap(intel); mapNote(); renderHud();
          if(intel) renderGci(); }
 }
 
 $('#views').querySelectorAll('.sb').forEach(b=>b.onclick=()=>{
   view=b.dataset.v;
-  $('#views').querySelectorAll('.sb').forEach(x=>x.classList.toggle('on',x===b));
+  $('#views').querySelectorAll('.sb').forEach(x=>{
+    const on = x===b;
+    x.classList.toggle('on',on);
+    x.setAttribute('aria-selected', on?'true':'false');
+  });
   draw();
 });
 
