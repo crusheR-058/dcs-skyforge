@@ -1023,14 +1023,15 @@ const roleOf = n => ROLES[String(n||'').trim().toLowerCase()] || null;
 // XP Pretense already writes and is never written back, so the mission file
 // and the server are untouched.
 //
-// The first four ranks come quickly, so a new pilot moves twice in their first
-// few nights: the roster's median is 613 XP and its floor is 0.
+// Each promotion costs more than the last until the ladder flattens out:
 //
-// Then there is a deliberate wall. Group Captain sits at 40,000, close to
-// twice what the squadron's strongest pilot has accumulated so far, and every
-// rank above it is a flat 30,000 further on rather than a multiple. Senior
-// rank is meant to be a season's work rather than a month's, and the even
-// steps above the wall mean the last four promotions all cost the same.
+//   1,000 -> 5,000 -> 10,000 -> 24,000 -> then a flat 30,000 for the rest
+//
+// So the first rank is a night or two of flying, the middle of the ladder is
+// real work, and the five air officer ranks all cost the same 30,000 apiece.
+// Group Captain at 40,000 is the wall -- roughly twice what the squadron's
+// strongest pilot has accumulated so far -- and senior rank is meant to be a
+// season's work rather than a month's.
 //
 // Marshal of the Indian Air Force is deliberately absent. It is a five-star
 // honour held once in the service's history, by Arjan Singh, and is not a
@@ -1040,9 +1041,9 @@ const roleOf = n => ROLES[String(n||'').trim().toLowerCase()] || null;
 // 0.5 = the thin bar that sits between a Squadron Leader's two mediums.
 const RANKS=[
   {xp:      0, ab:'Fg Offr',  name:'Flying Officer',     braid:[1]},
-  {xp:    250, ab:'Flt Lt',   name:'Flight Lieutenant',  braid:[1,1]},
-  {xp:    750, ab:'Sqn Ldr',  name:'Squadron Leader',    braid:[1,0.5,1]},
-  {xp:  2000, ab:'Wg Cdr',   name:'Wing Commander',     braid:[1,1,1]},
+  {xp:   1000, ab:'Flt Lt',   name:'Flight Lieutenant',  braid:[1,1]},
+  {xp:   6000, ab:'Sqn Ldr',  name:'Squadron Leader',    braid:[1,0.5,1]},
+  {xp: 16000, ab:'Wg Cdr',   name:'Wing Commander',     braid:[1,1,1]},
   {xp: 40000, ab:'Gp Capt',  name:'Group Captain',      braid:[1,1,1,1]},
   {xp: 70000, ab:'Air Cmde', name:'Air Commodore',      braid:[2]},
   {xp:100000, ab:'AVM',      name:'Air Vice Marshal',   braid:[2,1]},
