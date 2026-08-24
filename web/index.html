@@ -1131,6 +1131,12 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
 .pl-tag.hostile{color:var(--rose);border-color:rgba(217,69,92,.42)}
 .pl-tag.friendly{color:var(--blue);border-color:rgba(76,143,232,.42)}
 .pl-tag.live{border-style:solid;box-shadow:0 0 0 1px rgba(69,192,138,.28)}
+.pl-zn{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.pl-zn i{width:9px;height:9px;border-radius:50%;display:block;flex:none;
+  box-shadow:0 0 0 1.5px rgba(10,14,20,.8)}
+.pl-zn span{font:600 10px/1 var(--mono);letter-spacing:.05em;
+  text-shadow:0 0 3px rgba(10,14,20,.98),0 0 7px rgba(10,14,20,.9),
+              0 0 11px rgba(10,14,20,.75)}
 
 @media(max-width:1180px){ #planner.on{grid-template-columns:200px 1fr 212px} }
 @media(max-width:900px){
@@ -1200,7 +1206,7 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
   <div class="pl-bar">
     <div class="pl-op">
       <span class="pl-fact">OP</span>
-      <input id="plName" value="IRON HAMMER" spellcheck="false" aria-label="Operation name">
+      <input id="plName" value="DYNAMIC CAMPAIGN" spellcheck="false" aria-label="Operation name">
     </div>
     <span class="pl-fact">THEATRE<i id="plThe">CAUCASUS</i></span>
     <span class="pl-fact">SERVER<i id="plSrv">&mdash;</i></span>
@@ -2820,7 +2826,7 @@ const plNow = () => new Date().toISOString();
 const $p    = s => document.querySelector(s);
 
 function plBlank(){
-  return {id:plId('op-'),name:'IRON HAMMER',theatre:'Caucasus',state:'DRAFT',
+  return {id:plId('op-'),name:'DYNAMIC CAMPAIGN',theatre:'Caucasus',state:'DRAFT',
     created:plNow(),modified:plNow(),version:1,
     targets:[],flights:[],drawings:[],notes:'',history:[]};
 }
@@ -2962,11 +2968,22 @@ function plDrawMap(){
       interactive:true}).bindTooltip(b.n,{direction:'top'}).addTo(PL.g.bases);
   });
 
+  const own=PLDATA.owner||{};
   if(L1.zones) Object.entries(PLDATA.zones||{}).forEach(([n,ll])=>{
-    const z=(PLDATA.owner||{})[n];
-    const c = z===2?'rgba(76,143,232,.5)':z===1?'rgba(217,69,92,.5)':'rgba(124,140,163,.4)';
-    L.circleMarker([ll[0],ll[1]],{radius:3,color:c,weight:1,fill:true,
-      fillColor:c,fillOpacity:.35,interactive:false}).addTo(PL.g.zones);
+    // zones.json maps 333 Caucasus place names; only the ~61 the campaign
+    // actually contests are objectives. Labelling the rest implies they are
+    // targets and buries the ones that matter under terrain the basemap
+    // already names.
+    if(!(n in own)) return;
+    const z=own[n];
+    const c = z===2?'var(--blue)':z===1?'var(--rose)':'var(--neutral)';
+    // A label per zone, not a tooltip: 61 of these are the political picture
+    // you plan against, and hovering each one to read it is not planning.
+    // The glow does the work a background box would, without 61 boxes.
+    L.marker([ll[0],ll[1]],{interactive:false,zIndexOffset:-400,
+      icon:L.divIcon({className:'pl-mk',iconSize:null,iconAnchor:[5,5],
+        html:`<div class="pl-zn"><i style="background:${c}"></i>`
+            +`<span style="color:${c}">${esc(n)}</span></div>`})}).addTo(PL.g.zones);
   });
 
   // LIVE mode overlays what the server reports; it never edits the plan.
