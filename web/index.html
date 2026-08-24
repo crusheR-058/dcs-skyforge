@@ -1134,6 +1134,9 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
 .pl-zn{display:flex;align-items:center;gap:5px;white-space:nowrap}
 .pl-zn i{width:9px;height:9px;border-radius:50%;display:block;flex:none;
   box-shadow:0 0 0 1.5px rgba(10,14,20,.8)}
+.pl-zn.base span{font-weight:500;font-size:9.5px;opacity:.92}
+.pl-zn.base i{display:none}
+.pl-zn.un span{opacity:.6}
 .pl-zn span{font:600 10px/1 var(--mono);letter-spacing:.05em;
   text-shadow:0 0 3px rgba(10,14,20,.98),0 0 7px rgba(10,14,20,.9),
               0 0 11px rgba(10,14,20,.75)}
@@ -2957,25 +2960,67 @@ function plMarker(o,opts){
   });
 }
 
+// Which campaign zone an airfield belongs to, if any. Match on the first token
+// ("Senaki-Kolkhi" -> Senaki) or a prefix that ends on a word boundary, so a
+// short zone name cannot swallow an unrelated field.
+function plBaseZone(name, own){
+  const s=String(name||'').toLowerCase();
+  const first=s.replace(/[-_]/g,' ').split(' ')[0];
+  for(const z in own){
+    const zl=z.toLowerCase();
+    if(first===zl) return z;
+    if(s.length>zl.length && s.startsWith(zl) && /[-_ ]/.test(s[zl.length])) return z;
+  }
+  return null;
+}
+// The DCS export reports coalition 0 for twelve fields, including Sukhumi,
+// which the campaign holds. Where a field is an objective the zone is
+// authoritative; everywhere else the export's own flag stands, and a field that
+// is neither is genuinely uncontested rather than unknown.
+function plBaseOwner(b, own){
+  const z=plBaseZone(b.n, own);
+  return {zone:z, side:(z && own[z]!=null) ? own[z] : b.c};
+}
+const plIsShip = n => /^(CVN|LHA|DDG|FFG)/i.test(String(n||''));
+
 function plDrawMap(){
   if(!PL.ready) return;
   Object.values(PL.g).forEach(g=>g.clearLayers());
   const p=PL.plan, L1=PL.lay, locked=p.state==='LOCKED';
-
-  if(L1.bases) (PLDATA.bases||[]).forEach(b=>{
-    const c = b.c===2?'var(--blue)':b.c===1?'var(--rose)':'var(--neutral)';
-    L.marker([b.lat,b.lon],{icon:L.divIcon({className:'pl-mk',
-      html:plSym('base',c,false,13),iconSize:null,iconAnchor:[6,6]}),
-      interactive:true}).bindTooltip(b.n,{direction:'top'}).addTo(PL.g.bases);
-  });
-
+  // Read by both the bases and the zones pass below, so it is declared once up
+  // here rather than beside whichever happens to use it first.
   const own=PLDATA.owner||{};
+
+  const baseZone={};
+  if(L1.bases){
+    const seen={};
+    (PLDATA.bases||[]).forEach(b=>{
+      const ship=plIsShip(b.n);
+      // CVN-74 ships as five points two kilometres apart -- the group, not five
+      // carriers. At planning scale that is one asset.
+      const key=ship ? b.n.replace(/-\d+$/,'') : b.n;
+      if(ship){ if(seen[key]) return; seen[key]=1; }
+      const {zone,side}=plBaseOwner(b, own);
+      if(zone) baseZone[zone]=1;
+      const c = side===2?'var(--blue)':side===1?'var(--rose)':'var(--neutral)';
+      L.marker([b.lat,b.lon],{interactive:false,zIndexOffset:-300,
+        icon:L.divIcon({className:'pl-mk',iconSize:null,iconAnchor:[6,6],
+          html:`<div class="pl-zn base${side?'':' un'}">`
+              +plSym(ship?'naval':'base',c,false,13)
+              +`<span style="color:${c}">${esc(key)}</span></div>`})})
+        .addTo(PL.g.bases);
+    });
+  }
+
   if(L1.zones) Object.entries(PLDATA.zones||{}).forEach(([n,ll])=>{
     // zones.json maps 333 Caucasus place names; only the ~61 the campaign
     // actually contests are objectives. Labelling the rest implies they are
     // targets and buries the ones that matter under terrain the basemap
     // already names.
     if(!(n in own)) return;
+    // Airfields already draw themselves, in this same colour and with the same
+    // name. A second dot beside them is noise.
+    if(baseZone[n]) return;
     const z=own[n];
     const c = z===2?'var(--blue)':z===1?'var(--rose)':'var(--neutral)';
     // A label per zone, not a tooltip: 61 of these are the political picture
