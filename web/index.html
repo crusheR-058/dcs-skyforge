@@ -2636,6 +2636,7 @@ function draw(){
   $('#map').style.display   = isMap  ?'block':'none';
   $('#panel').style.display = isPanel?'block':'none';
   $('#planner').classList.toggle('on', isPlan);
+  if(!isPlan && typeof PL==='object') PL.visible=false;
 
   // The whole filter bar belongs to Ops. Leaving an empty strip on Map or
   // Pilots was 38px of chrome that answered nothing.
@@ -3474,8 +3475,8 @@ function plTools(){
     b.onclick=()=>plTool(b.dataset.t));
 }
 function plChrome(){
-  const p=PL.plan;
-  $p('#plName').value=p.name;
+  const p=PL.plan, nameEl=$p('#plName');
+  if(nameEl && document.activeElement!==nameEl) nameEl.value=p.name;
   const st=$p('#plState');
   st.textContent=p.state;
   st.className='pl-st'+(p.state==='READY'?' ready':p.state==='LOCKED'?' locked':'');
@@ -3483,18 +3484,44 @@ function plChrome(){
   $p('#plUndo').disabled=!PL.undo.length;
   $p('#plRedo').disabled=!PL.redo.length;
   const srv=$p('#plSrv');
-  if(srv) srv.textContent=(PLDATA.online?'ONLINE':'OFFLINE');
+  if(srv){
+    // Say how stale, the way the masthead does. "OFFLINE" with no age reads as
+    // a guess; "OFFLINE 1d" is a fact.
+    const a=PLDATA.age;
+    srv.textContent = PLDATA.online
+      ? 'ONLINE · '+PLDATA.players+(PLDATA.players===1?' PILOT':' PILOTS')
+      : (a==null ? 'NO DATA' : 'OFFLINE '+ago(a));
+    srv.style.color = PLDATA.online ? 'var(--jade)' : 'var(--ink-3)';
+  }
   const hud=$p('#plHud');
-  const n=(k)=>p[k].length;
-  hud.innerHTML=`<div><span data-ll>&mdash;</span></div>
-    <div>TGT <b>${n('targets')}</b> · FLT <b>${n('flights')}</b> · DRW <b>${n('drawings')}</b></div>
-    <div class="lay">${Object.entries({bases:'Airbases',zones:'Zones',targets:'Targets',
-      flights:'Flights',routes:'Routes',draw:'Drawings'}).map(([k,l])=>
-      `<label><input type="checkbox" data-lay="${k}"${PL.lay[k]?' checked':''}>${l}</label>`).join('')}</div>`;
-  hud.querySelectorAll('[data-lay]').forEach(c=>c.onchange=()=>{
-    PL.lay[c.dataset.lay]=c.checked; plDrawMap(); });
+  const cnt=(k)=>p[k].length;
+  const tally=`TGT <b>${cnt('targets')}</b> · FLT <b>${cnt('flights')}</b>`
+            + ` · DRW <b>${cnt('drawings')}</b>`
+            + (PL.live?` · LIVE <b>${PLDATA.units.length}</b>`:'');
+  if(!hud.querySelector('[data-lay]')){
+    hud.innerHTML=`<div><span data-ll>&mdash;</span></div>
+      <div class="tally">${tally}</div>
+      <div class="lay">${Object.entries({bases:'Airbases',zones:'Zones',targets:'Targets',
+        flights:'Flights',routes:'Routes',draw:'Drawings'}).map(([k,l])=>
+        `<label><input type="checkbox" data-lay="${k}"${PL.lay[k]?' checked':''}>${l}</label>`).join('')}</div>`;
+    hud.querySelectorAll('[data-lay]').forEach(c=>c.onchange=()=>{
+      PL.lay[c.dataset.lay]=c.checked; plDrawMap(); });
+  } else {
+    hud.querySelector('.tally').innerHTML=tally;
+  }
 }
 function plAll(){ if(!PL.plan) return; plChrome(); plTools(); plRails(); plTimeline(); plDrawMap(); }
+
+// The 10s poll calls draw(), which used to run the full plAll() -- rebuilding
+// the rails out from under anything half-typed in the inspector. A refresh
+// touches the live parts and leaves a focused rail alone.
+function plRefresh(){
+  if(!PL.plan) return;
+  plChrome();
+  if(PL.live) plDrawMap();
+  const a=document.activeElement;
+  if(!(a && a.closest && a.closest('.pl-rail'))) { plRails(); plTimeline(); }
+}
 
 /* ---- briefing ----------------------------------------------------------- */
 function plBriefText(){
@@ -3580,8 +3607,13 @@ function plOpen(){
     const want=(location.hash.match(/plan=([\w-]+)/)||[])[1];
     PL.plan=(want&&plLoad(want)) || plBlank();
   }
-  requestAnimationFrame(()=>{ PL.map.invalidateSize(); plAll(); });
-  plAll();
+  // draw() fires both on the nav click and on every poll. Only the first is an
+  // open; the rest are refreshes and must not rebuild what is being edited.
+  if(!PL.visible){
+    PL.visible=true;
+    plAll();
+    requestAnimationFrame(()=>{ PL.map.invalidateSize(); plAll(); });
+  } else plRefresh();
 }
 
 /* ---- data adapter -------------------------------------------------------
@@ -3596,7 +3628,12 @@ const PLDATA={
   get bases(){ return D.bases||(D.live&&D.live.world&&D.live.world.bases)||[]; },
   get zones(){ return (D.zones&&D.zones.zones)||{}; },
   get units(){ return (D.live&&D.live.world&&D.live.world.units)||[]; },
-  get online(){ return !!(D.status&&D.status.online); },
+  get online(){
+    const s=D.status;
+    return !!(s && s.online && (Date.now()/1000-s.ts) < STALE);
+  },
+  get age(){ const s=D.status; return s ? Date.now()/1000-s.ts : null; },
+  get players(){ const s=D.status; return (s&&s.players)||0; },
   get owner(){
     const o={}, zs=(D.campaign&&D.campaign.zones)||{};
     Object.values(zs).forEach(z=>{ if(z&&z.name) o[z.name]=z.side; });
@@ -3698,9 +3735,14 @@ function plWire(){
   const mp=$p('#plModeP'), ml=$p('#plModeL');
   const mode=live=>{ PL.live=live; mp.classList.toggle('on',!live);
     ml.classList.toggle('on',live); ml.classList.toggle('live',live);
-    plHint(live?(PLDATA.units.length?'':'Server is reporting no units right now')
-              :'');
-    plDrawMap(); };
+    if(!live) plHint('');
+    else if(!PLDATA.online)
+      plHint('Server offline'+(PLDATA.age==null?'':' for '+ago(PLDATA.age))
+             +' — no live picture. The plan is unaffected.');
+    else if(!PLDATA.units.length)
+      plHint('Server online, reporting no units right now');
+    else plHint(PLDATA.units.length+' live contacts');
+    plChrome(); plDrawMap(); };
   mp.onclick=()=>mode(false); ml.onclick=()=>mode(true);
 
   addEventListener('keydown',e=>{
