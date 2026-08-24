@@ -929,6 +929,225 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
   .pop-ctx{width:100%}
 }
 
+
+/* ============================ MISSION PLANNER ============================
+   The map is the workspace. Rails dock either side of it rather than floating
+   over it -- occluding the chart to look modern costs you the thing you opened
+   the page for. Everything reuses the board palette and hairlines; the one new
+   idea is that PLANNED objects draw dashed and LIVE objects draw solid, so the
+   two never have to be told apart by colour. */
+#planner{display:none;height:100%;background:var(--graphite)}
+#planner.on{display:grid;grid-template-columns:232px 1fr 238px;
+  grid-template-rows:auto 1fr auto;min-height:0}
+
+.pl-bar{grid-column:1/-1;display:flex;align-items:center;gap:14px;
+  padding:0 14px;height:40px;border-bottom:1px solid var(--rule);
+  background:var(--slate)}
+.pl-op{display:flex;align-items:baseline;gap:9px;min-width:0}
+.pl-op input{background:none;border:none;color:var(--ink);font:600 13px/1 var(--ui);
+  padding:3px 5px;border-radius:2px;max-width:240px;min-width:90px}
+.pl-op input:focus{outline:none;background:var(--raised);
+  box-shadow:0 0 0 1px var(--rule-hot)}
+.pl-fact{font:500 9px/1 var(--mono);letter-spacing:.14em;color:var(--ink-3);
+  text-transform:uppercase;white-space:nowrap}
+.pl-fact i{font-style:normal;color:var(--ink-2);margin-left:5px}
+.pl-sp{flex:1}
+.pl-st{font:500 9px/1 var(--mono);letter-spacing:.14em;padding:5px 7px;
+  border-radius:2px;border:1px solid var(--rule-2);color:var(--ink-2)}
+.pl-st.ready{color:var(--jade);border-color:rgba(69,192,138,.35)}
+.pl-st.locked{color:var(--amber);border-color:rgba(232,163,61,.35)}
+.pl-act{display:flex;gap:5px}
+.pl-act button{font:500 9.5px/1 var(--mono);letter-spacing:.11em;color:var(--ink-2);
+  background:var(--panel);border:1px solid var(--rule-2);border-radius:2px;
+  padding:6px 9px;cursor:pointer;white-space:nowrap}
+.pl-act button:hover:not(:disabled){color:var(--ink);border-color:var(--rule-hot)}
+.pl-act button:disabled{opacity:.34;cursor:default}
+.pl-act button.hot{color:var(--blue);border-color:var(--blue-dim)}
+
+.pl-rail{min-height:0;overflow-y:auto;background:var(--slate);
+  display:flex;flex-direction:column;position:relative}
+.pl-rail.l{border-right:1px solid var(--rule)}
+.pl-rail.r{border-left:1px solid var(--rule)}
+.pl-sec{border-bottom:1px solid var(--rule)}
+.pl-sec>h5{font:500 8.5px/1 var(--mono);letter-spacing:.17em;color:var(--ink-3);
+  text-transform:uppercase;padding:11px 12px 8px;margin:0;
+  display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pl-sec>h5 button{font:500 8.5px/1 var(--mono);letter-spacing:.1em;color:var(--blue);
+  background:none;border:none;cursor:pointer;padding:0}
+.pl-sec>h5 button:hover{text-decoration:underline}
+
+.pl-row{display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;
+  border-left:2px solid transparent}
+.pl-row:hover{background:var(--panel)}
+.pl-row.on{background:var(--panel);border-left-color:var(--blue)}
+.pl-row .nm{flex:1;min-width:0;font:500 11.5px/1.3 var(--ui);color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-row .sub{font:400 9px/1 var(--mono);letter-spacing:.07em;color:var(--ink-3);
+  white-space:nowrap}
+.pl-ico{width:17px;height:17px;flex:none;display:block}
+.pl-cat{display:flex;gap:4px;padding:5px 12px 9px;flex-wrap:wrap}
+.pl-cat button{font:500 8.5px/1 var(--mono);letter-spacing:.1em;color:var(--ink-3);
+  background:none;border:1px solid var(--rule-2);border-radius:2px;padding:4px 6px;
+  cursor:pointer}
+.pl-cat button.on{color:var(--ink);border-color:var(--rule-hot);background:var(--panel)}
+
+.pl-fl{padding:8px 12px;border-bottom:1px solid var(--rule);cursor:pointer;
+  border-left:2px solid transparent}
+.pl-fl:hover{background:var(--panel)}
+.pl-fl.on{background:var(--panel);border-left-color:var(--blue)}
+.pl-fl .top{display:flex;align-items:center;gap:7px}
+.pl-fl .cs{flex:1;font:600 11.5px/1 var(--mono);letter-spacing:.05em;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-fl .role{font:500 8.5px/1 var(--mono);letter-spacing:.11em;padding:3px 5px;
+  border-radius:2px;border:1px solid var(--rule-2);color:var(--ink-2);flex:none}
+.pl-fl .meta{font:400 9.5px/1.5 var(--mono);color:var(--ink-3);margin-top:4px;
+  display:flex;flex-wrap:wrap;gap:1px 10px}
+.pl-fl .meta b{font-weight:500;color:var(--ink-2)}
+.pl-empty{padding:11px 12px;font:400 10.5px/1.55 var(--ui);color:var(--ink-3)}
+
+.pl-stage{position:relative;min-height:0;background:var(--graphite)}
+#pmap{position:absolute;inset:0;background:var(--graphite)}
+#pmap.aim,#pmap.aim .leaflet-grab{cursor:crosshair}
+#pmap.kill,#pmap.kill .leaflet-grab{cursor:cell}
+.pl-tools{position:absolute;left:9px;top:9px;z-index:620;display:flex;
+  flex-direction:column;gap:3px;background:rgba(17,24,35,.94);
+  border:1px solid var(--rule-2);border-radius:3px;padding:3px}
+.pl-tools button{width:30px;height:28px;display:grid;place-items:center;
+  background:none;border:none;border-radius:2px;cursor:pointer;color:var(--ink-3)}
+.pl-tools button:hover:not(:disabled){background:var(--raised);color:var(--ink-2)}
+.pl-tools button.on{background:var(--raised);color:var(--blue)}
+.pl-tools button:disabled{opacity:.3;cursor:default}
+.pl-tools .div{height:1px;background:var(--rule-2);margin:2px 3px}
+.pl-tools svg{width:15px;height:15px;display:block}
+
+.pl-hud{position:absolute;right:9px;top:9px;z-index:620;
+  background:rgba(17,24,35,.94);border:1px solid var(--rule-2);border-radius:3px;
+  padding:7px 9px;font:500 9px/1.75 var(--mono);letter-spacing:.09em;color:var(--ink-3);
+  min-width:140px}
+.pl-hud b{color:var(--ink-2);font-weight:500}
+.pl-hud .lay{margin-top:6px;padding-top:6px;border-top:1px solid var(--rule)}
+.pl-hud label{display:flex;align-items:center;gap:6px;cursor:pointer;
+  color:var(--ink-3);text-transform:uppercase}
+.pl-hud label:hover{color:var(--ink-2)}
+.pl-hud input{accent-color:var(--blue);width:10px;height:10px;margin:0}
+.pl-mode{position:absolute;left:50%;top:9px;transform:translateX(-50%);z-index:620;
+  display:flex;background:rgba(17,24,35,.94);border:1px solid var(--rule-2);
+  border-radius:3px;overflow:hidden}
+.pl-mode button{font:500 9px/1 var(--mono);letter-spacing:.13em;color:var(--ink-3);
+  background:none;border:none;padding:7px 12px;cursor:pointer}
+.pl-mode button.on{background:var(--raised);color:var(--ink)}
+.pl-mode button.on.live{color:var(--jade)}
+.pl-hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:620;
+  font:500 9px/1 var(--mono);letter-spacing:.12em;color:var(--ink-2);
+  background:rgba(17,24,35,.94);border:1px solid var(--rule-2);border-radius:3px;
+  padding:6px 10px;white-space:nowrap;display:none}
+.pl-hint.on{display:block}
+
+.pl-time{grid-column:1/-1;border-top:1px solid var(--rule);background:var(--slate);
+  height:120px;display:flex;flex-direction:column;min-height:0}
+.pl-time>h5{font:500 8.5px/1 var(--mono);letter-spacing:.17em;color:var(--ink-3);
+  text-transform:uppercase;padding:9px 14px 7px;margin:0;
+  display:flex;justify-content:space-between}
+.pl-time>h5 i{font-style:normal;color:var(--ink-2);letter-spacing:.1em}
+.pl-tl{flex:1;overflow:auto;padding:0 14px 10px;min-height:0}
+.pl-tl table{border-collapse:collapse;width:100%;min-width:520px}
+.pl-tl th{font:500 8.5px/1 var(--mono);letter-spacing:.1em;color:var(--ink-3);
+  font-weight:500;text-align:left;padding:0 0 5px;border-bottom:1px solid var(--rule)}
+.pl-tl td{padding:3px 0;vertical-align:middle}
+.pl-tl td.cs{font:600 10px/1 var(--mono);color:var(--ink-2);width:82px;
+  white-space:nowrap;padding-right:8px;cursor:pointer}
+.pl-tl td.cs:hover{color:var(--ink)}
+.pl-tl th:last-child,.pl-tl td:last-child{width:100%}
+.pl-tl .track{position:relative;height:16px;width:100%;min-width:180px}
+.pl-tl .ticks{position:relative;height:11px;width:100%;min-width:180px}
+.pl-tl .bar{position:absolute;height:5px;top:5px;border-radius:1px;
+  background:var(--blue-dim);cursor:pointer}
+.pl-tl .bar.on{background:var(--blue)}
+.pl-tl .tot{position:absolute;top:1px;width:2px;height:14px;background:var(--amber)}
+.pl-tl .lbl{position:absolute;top:0;font:500 8.5px/1 var(--mono);color:var(--ink-3);
+  white-space:nowrap;transform:translateX(5px)}
+.pl-tl .grid{position:absolute;top:0;bottom:0;width:1px;background:var(--rule)}
+
+.pl-insp{position:absolute;inset:0;background:var(--slate);z-index:5;
+  display:flex;flex-direction:column;min-height:0}
+.pl-insp .hd{display:flex;align-items:center;gap:8px;padding:10px 12px;
+  border-bottom:1px solid var(--rule)}
+.pl-insp .hd .t{flex:1;min-width:0;font:600 12px/1.35 var(--ui);color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis}
+.pl-insp .hd button{background:none;border:none;color:var(--ink-3);cursor:pointer;
+  font-size:18px;line-height:1;padding:0 2px}
+.pl-insp .hd button:hover{color:var(--ink)}
+.pl-insp .bd{flex:1;overflow-y:auto;min-height:0}
+.pl-kv{display:flex;justify-content:space-between;gap:10px;padding:6px 12px;
+  border-bottom:1px solid var(--rule);font:400 10.5px/1.45 var(--ui)}
+.pl-kv .k{color:var(--ink-3);white-space:nowrap}
+.pl-kv .v{color:var(--ink-2);text-align:right;font-family:var(--mono);
+  font-size:10px;min-width:0;overflow-wrap:anywhere}
+.pl-fld{padding:7px 12px;border-bottom:1px solid var(--rule)}
+.pl-fld label{display:block;font:500 8.5px/1 var(--mono);letter-spacing:.13em;
+  color:var(--ink-3);text-transform:uppercase;margin-bottom:5px}
+.pl-fld input,.pl-fld select,.pl-fld textarea{width:100%;background:var(--panel);
+  border:1px solid var(--rule-2);border-radius:2px;color:var(--ink);
+  font:400 11px/1.4 var(--ui);padding:5px 7px;font-family:var(--ui)}
+.pl-fld input:focus,.pl-fld select:focus,.pl-fld textarea:focus{
+  outline:none;border-color:var(--rule-hot)}
+.pl-fld textarea{resize:vertical;min-height:48px}
+.pl-fld .row{display:flex;gap:6px}
+.pl-btns{display:flex;flex-wrap:wrap;gap:5px;padding:9px 12px}
+.pl-btns button{flex:1;min-width:66px;font:500 9px/1 var(--mono);letter-spacing:.1em;
+  color:var(--ink-2);background:var(--panel);border:1px solid var(--rule-2);
+  border-radius:2px;padding:6px;cursor:pointer}
+.pl-btns button:hover{color:var(--ink);border-color:var(--rule-hot)}
+.pl-btns button.danger:hover{color:var(--rose);border-color:rgba(217,69,92,.4)}
+
+.pl-pil{display:flex;flex-wrap:wrap;gap:4px;padding:0 12px 9px}
+.pl-pil span{display:inline-flex;align-items:center;gap:6px;font:500 9.5px/1 var(--mono);
+  color:var(--ink-2);background:var(--panel);border:1px solid var(--rule-2);
+  border-radius:2px;padding:4px 6px}
+.pl-pil span b{color:var(--ink-3);cursor:pointer;font-weight:400;font-size:11px}
+.pl-pil span b:hover{color:var(--rose)}
+
+#pbrief{position:fixed;inset:0;z-index:1400;display:none;
+  background:rgba(6,9,13,.74)}
+#pbrief.on{display:grid;place-items:center}
+#pbrief .sheet{width:min(660px,92vw);max-height:84vh;display:flex;flex-direction:column;
+  background:var(--slate);border:1px solid var(--rule-2);border-radius:4px}
+#pbrief .hd{display:flex;align-items:center;gap:10px;padding:12px 14px;
+  border-bottom:1px solid var(--rule)}
+#pbrief .hd .t{flex:1;font:600 13px/1 var(--ui);color:var(--ink)}
+#pbrief pre{flex:1;overflow:auto;margin:0;padding:14px;white-space:pre-wrap;
+  font:400 11.5px/1.65 var(--mono);color:var(--ink-2)}
+#pbrief .ft{display:flex;gap:6px;justify-content:flex-end;padding:10px 14px;
+  border-top:1px solid var(--rule)}
+#pbrief button{font:500 9.5px/1 var(--mono);letter-spacing:.11em;color:var(--ink-2);
+  background:var(--panel);border:1px solid var(--rule-2);border-radius:2px;
+  padding:7px 11px;cursor:pointer}
+#pbrief button:hover{color:var(--ink);border-color:var(--rule-hot)}
+#pbrief button.hot{color:var(--blue);border-color:var(--blue-dim)}
+
+.pl-tag{font:500 9px/1 var(--mono);letter-spacing:.05em;color:var(--ink-2);
+  background:rgba(17,24,35,.88);border:1px solid var(--rule-2);border-radius:2px;
+  padding:2px 4px;white-space:nowrap}
+.pl-tag.hostile{color:var(--rose);border-color:rgba(217,69,92,.42)}
+.pl-tag.friendly{color:var(--blue);border-color:rgba(76,143,232,.42)}
+.pl-tag.live{border-style:solid;box-shadow:0 0 0 1px rgba(69,192,138,.28)}
+
+@media(max-width:1180px){ #planner.on{grid-template-columns:200px 1fr 212px} }
+@media(max-width:900px){
+  /* The action buttons matter more than the facts, so the bar wraps rather
+     than pushing BRIEFING off the edge. */
+  .pl-bar{height:auto;min-height:40px;flex-wrap:wrap;padding:7px 12px;gap:7px 11px}
+  .pl-op input{max-width:150px}
+  #planner.on{grid-template-columns:1fr;grid-template-rows:auto auto 1fr auto auto}
+  .pl-rail{max-height:150px;border:none;border-bottom:1px solid var(--rule)}
+  .pl-rail.r{order:5;border-top:1px solid var(--rule)}
+  .pl-time{height:100px}
+  .pl-tools{flex-direction:row;left:9px;right:9px;top:auto;bottom:9px;
+    overflow-x:auto}
+  .pl-tools .div{height:auto;width:1px;margin:3px 2px}
+  .pl-hud,.pl-hint{display:none}
+}
+
 </style>
 </head>
 <body>
@@ -948,6 +1167,7 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
     <nav id="views" role="tablist" aria-label="Views">
       <button class="sb on" data-v="list"    role="tab" aria-selected="true">Ops</button>
       <button class="sb"    data-v="map"     role="tab" aria-selected="false">Map</button>
+      <button class="sb"    data-v="planner" role="tab" aria-selected="false">Planner</button>
       <button class="sb"    data-v="pilots"  role="tab" aria-selected="false">Pilots</button>
       <button class="sb"    data-v="history" role="tab" aria-selected="false">Log</button>
       <button class="sb"    data-v="files"   role="tab" aria-selected="false">Files</button>
@@ -974,6 +1194,60 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
   </div></div>
   <div id="map" style="display:none"></div>
   <div id="panel" style="display:none"></div>
+
+<!-- ===================== MISSION PLANNER ===================== -->
+<div id="planner" role="region" aria-label="Mission planner">
+  <div class="pl-bar">
+    <div class="pl-op">
+      <span class="pl-fact">OP</span>
+      <input id="plName" value="IRON HAMMER" spellcheck="false" aria-label="Operation name">
+    </div>
+    <span class="pl-fact">THEATRE<i id="plThe">CAUCASUS</i></span>
+    <span class="pl-fact">SERVER<i id="plSrv">&mdash;</i></span>
+    <span class="pl-fact">SAVED<i id="plSaved">&mdash;</i></span>
+    <span class="pl-sp"></span>
+    <span class="pl-st" id="plState">DRAFT</span>
+    <div class="pl-act">
+      <button id="plUndo" title="Undo (Ctrl+Z)">UNDO</button>
+      <button id="plRedo" title="Redo (Ctrl+Shift+Z)">REDO</button>
+      <button id="plShare" title="Copy a link that loads this plan">SHARE</button>
+      <button id="plLock">LOCK</button>
+      <button id="plBrief" class="hot">BRIEFING</button>
+    </div>
+  </div>
+
+  <div class="pl-rail l" id="plLeft"></div>
+
+  <div class="pl-stage">
+    <div id="pmap"></div>
+    <div class="pl-tools" id="plTools"></div>
+    <div class="pl-mode">
+      <button id="plModeP" class="on">PLANNED</button>
+      <button id="plModeL">LIVE</button>
+    </div>
+    <div class="pl-hud" id="plHud"></div>
+    <div class="pl-hint" id="plHint"></div>
+  </div>
+
+  <div class="pl-rail r" id="plRight"></div>
+
+  <div class="pl-time">
+    <h5>Mission timeline <i id="plTlSpan"></i></h5>
+    <div class="pl-tl" id="plTl"></div>
+  </div>
+</div>
+
+<div id="pbrief" role="dialog" aria-modal="true" aria-label="Mission briefing">
+  <div class="sheet">
+    <div class="hd"><span class="t">Mission briefing</span>
+      <button id="pbClose" aria-label="Close">&times;</button></div>
+    <pre id="pbText"></pre>
+    <div class="ft">
+      <button id="pbCopy">COPY</button>
+      <button id="pbDl" class="hot">DOWNLOAD</button>
+    </div>
+  </div>
+</div>
   <div id="hud" style="display:none" aria-hidden="true">
     <div class="tl hudbox hud-theatre">
       <span class="t" id="hudTheatre">Caucasus</span>
@@ -1133,7 +1407,7 @@ let view = 'list', active = new Set(CATS);
 // outright in a private window, so never let it stop the page rendering.
 let intel = (() => { try { return localStorage.getItem('sf-intel') === '1'; }
                      catch(e) { return false; } })();
-let D = {status:null, campaign:null, live:null, pilots:null, history:null, zones:null,
+let D = {status:null, campaign:null, live:null, bases:null, pilots:null, history:null, zones:null,
          seen:null, combat:null, kd:null, feed:null};
 
 const $ = s => document.querySelector(s);
@@ -2340,10 +2614,13 @@ const PANELS={pilots:renderPilots, history:renderHistory, files:renderFiles};
 function draw(){
   renderHeader();
   syncHeaderHeight();
-  const isList=view==='list', isPanel=!!PANELS[view], isMap=!isList&&!isPanel;
+  const isList=view==='list', isPlan=view==='planner',
+        isPanel=!!PANELS[view], isMap=!isList&&!isPanel&&!isPlan;
 
   // Map draws its own world; the substrate would only sit under tiles.
-  $('#bg').style.display    = isMap  ?'none' :'block';
+  // The planner draws its own chart, same as the map: the substrate would
+  // only sit under tiles.
+  $('#bg').style.display    = (isMap||isPlan)?'none':'block';
   // Ops runs its columns to both edges; the margin apparatus belongs to the
   // three centred document pages.
   $('#bg').classList.toggle('doc', isPanel);
@@ -2352,6 +2629,7 @@ function draw(){
   $('#list').style.display  = isList ?'grid' :'none';
   $('#map').style.display   = isMap  ?'block':'none';
   $('#panel').style.display = isPanel?'block':'none';
+  $('#planner').classList.toggle('on', isPlan);
 
   // The whole filter bar belongs to Ops. Leaving an empty strip on Map or
   // Pilots was 38px of chrome that answered nothing.
@@ -2370,6 +2648,7 @@ function draw(){
   if(view!=='pilots') pShell=false;
 
   if(isList) renderList();
+  else if(isPlan) plOpen();
   else if(isPanel) PANELS[view]();
   else { map.invalidateSize(); renderMap(intel); mapNote(); renderHud();
          if(intel) renderGci(); }
@@ -2414,6 +2693,11 @@ async function tick(){
   // Live data outlives the server by design; ignore it once stale or the map
   // shows aircraft frozen in mid-air from days ago.
   D.live = lv && (Date.now()/1000-lv.ts)<STALE ? lv : null;
+  // Airfield positions are terrain, not telemetry. They must survive the
+  // staleness gate above, because planning mostly happens while the server is
+  // down and the planner still needs its map furniture.
+  const bs = lv && lv.world && lv.world.bases;
+  if(Array.isArray(bs) && bs.length) D.bases = bs;
   draw();
   $('#upd').textContent='updated '+new Date().toLocaleTimeString();
 }
@@ -2426,6 +2710,1006 @@ if(typeof ResizeObserver !== 'undefined' && $('#hdr')){
 } else if(typeof addEventListener === 'function'){
   addEventListener('resize', syncHeaderHeight);
 }
+
+/* ========================= MISSION PLANNER =========================
+   A planning workspace, not a second dashboard. The map owns the page and
+   everything else annotates it.
+
+   Two rules shape the whole module:
+
+   1. PLANNED and LIVE never share a representation. Planned objects are drawn
+      dashed and carry no telemetry; live objects come from live.json and draw
+      solid. They are separate arrays, separate layers, separate map modes --
+      so a plan can never be mistaken for what the server is actually doing.
+
+   2. Nothing is faked. Airbases and zone positions are real (zones.json and
+      live.json world.bases). Live units read from live.json world.units, which
+      is empty while the server is idle -- that shows as an honest empty state
+      rather than invented contacts. Plans persist to localStorage, and the UI
+      says "local" because there is no plan API yet. When one exists, plSave and
+      plLoad are the only two functions that have to change. */
+
+const PL = {
+  map:null, ready:false, plan:null, tool:'select', sel:null,
+  undo:[], redo:[], live:false, cat:'AD', dirty:false, saveT:0,
+  lay:{bases:true,zones:true,targets:true,flights:true,routes:true,draw:true},
+  g:{}, tmp:null, measure:null
+};
+
+// Curated from the unit types this campaign actually fields -- the Pretense
+// templates in the mission and the Hercules cargo manifest -- rather than the
+// whole DCS catalogue. cat drives the icon and the map symbol.
+const PL_UNITS = [
+  {c:'AD', n:'SA-2 Guideline',  t:'sam',  thr:'HIGH'},
+  {c:'AD', n:'SA-3 Goa',        t:'sam',  thr:'HIGH'},
+  {c:'AD', n:'SA-6 Gainful',    t:'sam',  thr:'HIGH'},
+  {c:'AD', n:'SA-8 Osa',        t:'sam',  thr:'MED'},
+  {c:'AD', n:'SA-10 Grumble',   t:'sam',  thr:'CRITICAL'},
+  {c:'AD', n:'SA-11 Buk',       t:'sam',  thr:'HIGH'},
+  {c:'AD', n:'SA-15 Tor',       t:'sam',  thr:'HIGH'},
+  {c:'AD', n:'SA-19 Tunguska',  t:'sam',  thr:'MED'},
+  {c:'AD', n:'ZSU-23-4 Shilka', t:'aaa',  thr:'MED'},
+  {c:'AD', n:'Strela-10',       t:'sam',  thr:'LOW'},
+  {c:'AD', n:'Hawk',            t:'sam',  thr:'HIGH'},
+  {c:'AD', n:'Patriot',         t:'sam',  thr:'CRITICAL'},
+  {c:'GND',n:'T-72',            t:'armor',thr:'MED'},
+  {c:'GND',n:'T-80',            t:'armor',thr:'MED'},
+  {c:'GND',n:'T-90',            t:'armor',thr:'HIGH'},
+  {c:'GND',n:'BMP-2',           t:'armor',thr:'LOW'},
+  {c:'GND',n:'BTR-80',          t:'armor',thr:'LOW'},
+  {c:'GND',n:'M-2 Bradley',     t:'armor',thr:'LOW'},
+  {c:'GND',n:'Command Post',    t:'obj',  thr:'LOW'},
+  {c:'GND',n:'Ammo Depot',      t:'obj',  thr:'LOW'},
+  {c:'GND',n:'Fuel Depot',      t:'obj',  thr:'LOW'},
+  {c:'AIR',n:'MiG-29',          t:'air',  thr:'HIGH'},
+  {c:'AIR',n:'Su-27',           t:'air',  thr:'HIGH'},
+  {c:'AIR',n:'Su-25',           t:'air',  thr:'MED'},
+  {c:'AIR',n:'Mi-24',           t:'air',  thr:'MED'},
+  {c:'NAV',n:'Frigate',         t:'naval',thr:'MED'},
+  {c:'NAV',n:'Destroyer',       t:'naval',thr:'HIGH'},
+  {c:'OBJ',n:'Objective',       t:'obj',  thr:'LOW'},
+  {c:'OBJ',n:'Bridge',          t:'obj',  thr:'LOW'}
+];
+const PL_CATS = [['AD','AIR DEF'],['GND','GROUND'],['AIR','AIR'],
+                 ['NAV','NAVAL'],['OBJ','OBJECTIVE']];
+
+// Roles are restricted per airframe -- a Hercules is not a CAP asset.
+const PL_AIR = [
+  {n:'F/A-18C', r:['STRIKE','SEAD','CAS','CAP','ESCORT']},
+  {n:'F-16C',   r:['SEAD','STRIKE','CAS','CAP','ESCORT']},
+  {n:'F-15C',   r:['CAP','ESCORT','INTERCEPT']},
+  {n:'Su-30MKI',r:['CAP','ESCORT','STRIKE','INTERCEPT']},
+  {n:'Su-27',   r:['CAP','ESCORT','INTERCEPT']},
+  {n:'Su-25',   r:['CAS','STRIKE']},
+  {n:'A-10C II',r:['CAS','STRIKE']},
+  {n:'MiG-29',  r:['CAP','INTERCEPT','ESCORT']},
+  {n:'AH-64D',  r:['CAS']},
+  {n:'UH-60L',  r:['CSAR','TRANSPORT']},
+  {n:'Mi-8MTV2',r:['CSAR','TRANSPORT']},
+  {n:'C-130J',  r:['TRANSPORT']},
+  {n:'KC-135',  r:['TANKER']},
+  {n:'E-3A',    r:['AWACS']}
+];
+const PL_WPT = ['WP','IP','TARGET','EGRESS','RTB','HOLD','REFUEL','CAP STATION'];
+
+const PL_ICON = {
+  sam:  'M8.5 1.6 15.4 14H1.6Z',
+  aaa:  'M8.5 2.4 14.6 13H2.4Z M8.5 6.2 11.6 11.6H5.4Z',
+  armor:'M1.8 6.4h13.4v5.2H1.8Z M4.6 4.6h5v1.8h-5Z',
+  air:  'M8.5 1.4 14.6 13.2 8.5 10.1 2.4 13.2Z',
+  naval:'M1.6 8.6h13.8l-2.4 4.6H4Z M8.5 2.4v6',
+  obj:  'M8.5 1.5 10.6 5.9 15.4 6.6 11.9 10 12.8 14.8 8.5 12.5 4.2 14.8 5.1 10 1.6 6.6 6.4 5.9Z',
+  wp:   'M8.5 2.2 14.8 8.5 8.5 14.8 2.2 8.5Z',
+  base: 'M2.2 8.5h12.6 M8.5 2.2v12.6 M5 5l7 7 M12 5l-7 7'
+};
+const PL_TOOLS = [
+  ['select','Select',   'M3 2l10 5.6-4.3 1.1-1.6 4.4Z'],
+  ['target','Target',   'M8.5 2v13 M2 8.5h13 M8.5 4.6a3.9 3.9 0 100 7.8 3.9 3.9 0 100-7.8'],
+  ['flight','Flight',   'M8.5 1.4 14.6 13.2 8.5 10.1 2.4 13.2Z'],
+  ['route','Route',     'M2.4 12.6 6 6l3.4 3.4L14.6 3'],
+  ['waypoint','Waypoint','M8.5 2.2 14.8 8.5 8.5 14.8 2.2 8.5Z'],
+  ['area','Area',       'M2.4 4.2 12.4 2.4l2.2 8.4-8.6 2.8Z'],
+  ['arrow','Arrow',     'M2.4 13 13.6 3.4 M9 3.2h4.8v4.6'],
+  ['text','Text',       'M3 3.4h11 M8.5 3.4v10.4'],
+  ['measure','Measure', 'M1.8 10 10 1.8l4.4 4.4-8.2 8.2Z M5 7.6l1.6 1.6 M7.6 5l1.6 1.6'],
+  ['erase','Erase',     'M3 11l6-6 4.2 4.2-6 6H5Z M2.4 14.6h11']
+];
+
+const plId  = p => p + Math.random().toString(36).slice(2,8);
+const plNow = () => new Date().toISOString();
+const $p    = s => document.querySelector(s);
+
+function plBlank(){
+  return {id:plId('op-'),name:'IRON HAMMER',theatre:'Caucasus',state:'DRAFT',
+    created:plNow(),modified:plNow(),version:1,
+    targets:[],flights:[],drawings:[],notes:'',history:[]};
+}
+
+/* ---- persistence. localStorage only, and the UI says so. --------------- */
+const PL_KEY = id => 'skyforge.plan.'+id;
+function plSave(quiet){
+  const p=PL.plan; if(!p) return;
+  p.modified=plNow();
+  try{
+    localStorage.setItem(PL_KEY(p.id), JSON.stringify(p));
+    const ix=plIndex(); ix[p.id]={name:p.name,modified:p.modified,state:p.state};
+    localStorage.setItem('skyforge.plans', JSON.stringify(ix));
+    PL.dirty=false;
+    const n=$p('#plSaved');
+    if(n) n.textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }catch(e){
+    const n=$p('#plSaved'); if(n) n.textContent='FAILED';
+  }
+  if(!quiet) plChrome();
+}
+function plIndex(){
+  try{ return JSON.parse(localStorage.getItem('skyforge.plans')||'{}'); }catch(e){ return {}; }
+}
+function plLoad(id){
+  try{
+    const raw=localStorage.getItem(PL_KEY(id));
+    if(!raw) return null;
+    const p=JSON.parse(raw);
+    // Tolerate plans written by an older build rather than throwing them away.
+    p.targets=p.targets||[]; p.flights=p.flights||[]; p.drawings=p.drawings||[];
+    p.history=p.history||[]; p.notes=p.notes||'';
+    return p;
+  }catch(e){ return null; }
+}
+
+/* ---- undo / redo. Whole-plan snapshots: a plan is a few KB, and the
+   alternative (per-field inverse ops) is where planning tools get their
+   subtlest bugs. ---------------------------------------------------------- */
+function plPush(label){
+  if(!PL.plan) return;
+  if(PL.plan.state==='LOCKED') return;
+  PL.undo.push({s:JSON.stringify(PL.plan),label:label||''});
+  if(PL.undo.length>60) PL.undo.shift();
+  PL.redo.length=0;
+  PL.dirty=true;
+  clearTimeout(PL.saveT); PL.saveT=setTimeout(()=>plSave(true),900);
+}
+function plRestore(from,to){
+  if(!from.length) return;
+  const cur=JSON.stringify(PL.plan);
+  const e=from.pop();
+  to.push({s:cur,label:e.label});
+  PL.plan=JSON.parse(e.s);
+  PL.sel=null; plAll();
+}
+
+/* ---- geometry ---------------------------------------------------------- */
+function plDist(a,b){                              // nautical miles
+  const R=3440.065, r=Math.PI/180;
+  const dLat=(b.lat-a.lat)*r, dLon=(b.lng-a.lng)*r;
+  const s=Math.sin(dLat/2)**2 +
+    Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(s)));
+}
+function plBrg(a,b){
+  const r=Math.PI/180, dLon=(b.lng-a.lng)*r;
+  const y=Math.sin(dLon)*Math.cos(b.lat*r);
+  const x=Math.cos(a.lat*r)*Math.sin(b.lat*r)-
+          Math.sin(a.lat*r)*Math.cos(b.lat*r)*Math.cos(dLon);
+  return (Math.atan2(y,x)/r+360)%360;
+}
+function plLegs(pts){
+  let d=0; for(let i=1;i<pts.length;i++)
+    d+=plDist({lat:pts[i-1].lat,lng:pts[i-1].lon},{lat:pts[i].lat,lng:pts[i].lon});
+  return d;
+}
+const plHM = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+function plMin(s){
+  const m=/^(\d{1,2}):(\d{2})$/.exec(String(s||'').trim());
+  return m ? (+m[1])*60+(+m[2]) : null;
+}
+
+/* ---- map ---------------------------------------------------------------- */
+function plInitMap(){
+  if(PL.ready) return;
+  // Leaflet's zoom control defaults to the top-left corner, which is where the
+  // tactical toolbar lives -- it sat on top of the target and flight tools.
+  PL.map=L.map('pmap',{zoomControl:false,preferCanvas:false,attributionControl:false})
+        .setView([42.6,42.0],7);
+  L.control.zoom({position:'bottomright'}).addTo(PL.map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    {subdomains:'abcd',maxZoom:18}).addTo(PL.map);
+  ['bases','zones','routes','targets','flights','draw','tmp'].forEach(k=>{
+    PL.g[k]=L.layerGroup().addTo(PL.map);
+  });
+  PL.map.on('click', plMapClick);
+  PL.map.on('mousemove', e=>{
+    const n=$p('#plHud');
+    if(n && n.dataset.ll!=='0'){
+      const f=(v,a,b)=>Math.abs(v).toFixed(3)+'°'+(v>=0?a:b);
+      const s=n.querySelector('[data-ll]');
+      if(s) s.textContent=f(e.latlng.lat,'N','S')+' '+f(e.latlng.lng,'E','W');
+    }
+    if(PL.measure && PL.measure.a) plMeasureTo(e.latlng);
+  });
+  PL.map.on('dblclick', e=>{ if(PL.tmp) { L.DomEvent.stop(e); plFinishRoute(); } });
+  PL.ready=true;
+}
+
+function plSym(kind,color,dashed,size){
+  const d=PL_ICON[kind]||PL_ICON.obj, s=size||17;
+  return `<svg viewBox="0 0 17 17" width="${s}" height="${s}" aria-hidden="true">`
+    +`<path d="${d}" fill="none" stroke="${color}" stroke-width="1.6"`
+    +` stroke-linejoin="round"${dashed?' stroke-dasharray="2.4 1.8"':''}/></svg>`;
+}
+function plMarker(o,opts){
+  const sel = PL.sel && PL.sel.id===o.id;
+  const html=`<div class="plm${sel?' sel':''}" style="display:flex;align-items:center;gap:4px">`
+    + plSym(opts.kind,opts.color,opts.dashed)
+    + (opts.label?`<span class="pl-tag ${opts.tag||''}">${esc(opts.label)}</span>`:'')
+    + `</div>`;
+  return L.marker([o.lat,o.lon],{
+    icon:L.divIcon({className:'pl-mk'+(sel?' sel':''),html,iconSize:null,iconAnchor:[8,8]}),
+    draggable:opts.drag,
+    zIndexOffset:sel?800:0
+  });
+}
+
+function plDrawMap(){
+  if(!PL.ready) return;
+  Object.values(PL.g).forEach(g=>g.clearLayers());
+  const p=PL.plan, L1=PL.lay, locked=p.state==='LOCKED';
+
+  if(L1.bases) (PLDATA.bases||[]).forEach(b=>{
+    const c = b.c===2?'var(--blue)':b.c===1?'var(--rose)':'var(--neutral)';
+    L.marker([b.lat,b.lon],{icon:L.divIcon({className:'pl-mk',
+      html:plSym('base',c,false,13),iconSize:null,iconAnchor:[6,6]}),
+      interactive:true}).bindTooltip(b.n,{direction:'top'}).addTo(PL.g.bases);
+  });
+
+  if(L1.zones) Object.entries(PLDATA.zones||{}).forEach(([n,ll])=>{
+    const z=(PLDATA.owner||{})[n];
+    const c = z===2?'rgba(76,143,232,.5)':z===1?'rgba(217,69,92,.5)':'rgba(124,140,163,.4)';
+    L.circleMarker([ll[0],ll[1]],{radius:3,color:c,weight:1,fill:true,
+      fillColor:c,fillOpacity:.35,interactive:false}).addTo(PL.g.zones);
+  });
+
+  // LIVE mode overlays what the server reports; it never edits the plan.
+  if(PL.live){
+    (PLDATA.units||[]).forEach(u=>{
+      if(u.lat==null||u.lon==null) return;
+      const c=u.c===2?'var(--blue)':u.c===1?'var(--rose)':'var(--amber)';
+      L.marker([u.lat,u.lon],{icon:L.divIcon({className:'pl-mk',
+        html:`<div style="display:flex;align-items:center;gap:4px">`
+             +plSym(u.air?'air':'armor',c,false)
+             +`<span class="pl-tag live">${esc(u.t||u.n||'CONTACT')}</span></div>`,
+        iconSize:null,iconAnchor:[8,8]})}).addTo(PL.g.targets);
+    });
+  }
+
+  if(L1.targets) p.targets.forEach(t=>{
+    const c = t.side==='HOSTILE'?'var(--rose)':t.side==='FRIENDLY'?'var(--blue)':'var(--amber)';
+    const m=plMarker(t,{kind:t.icon,color:c,dashed:true,drag:!locked&&PL.tool==='select',
+      label:t.name,tag:t.side==='HOSTILE'?'hostile':t.side==='FRIENDLY'?'friendly':''});
+    m.on('click',ev=>{L.DomEvent.stop(ev); plHit('target',t.id,ev);});
+    m.on('dragend',ev=>{const ll=ev.target.getLatLng();
+      plPush('move target'); t.lat=ll.lat; t.lon=ll.lng; plAll();});
+    m.addTo(PL.g.targets);
+  });
+
+  p.flights.forEach(f=>{
+    if(L1.routes && f.route && f.route.length>1){
+      const sel=PL.sel&&PL.sel.id===f.id;
+      L.polyline(f.route.map(w=>[w.lat,w.lon]),{
+        color:sel?'var(--blue)':'var(--blue-dim)',weight:sel?2.4:1.7,
+        dashArray:'6 4',opacity:.95,interactive:true})
+        .on('click',ev=>{L.DomEvent.stop(ev); plHit('flight',f.id,ev);})
+        .addTo(PL.g.routes);
+      f.route.forEach((w,i)=>{
+        L.marker([w.lat,w.lon],{icon:L.divIcon({className:'pl-mk',
+          html:`<div style="display:flex;align-items:center;gap:3px">`
+               +plSym('wp','var(--blue)',true,12)
+               +`<span class="pl-tag">${esc(w.kind==='WP'?'WP'+String(i+1).padStart(2,'0'):w.kind)}</span></div>`,
+          iconSize:null,iconAnchor:[6,6]}),draggable:!locked&&PL.tool==='select'})
+          .on('click',ev=>{L.DomEvent.stop(ev); plHit('wp',f.id+'|'+w.id,ev);})
+          .on('dragend',ev=>{const ll=ev.target.getLatLng();
+            plPush('move waypoint'); w.lat=ll.lat; w.lon=ll.lng; plAll();})
+          .addTo(PL.g.routes);
+      });
+    }
+    if(L1.flights && f.lat!=null){
+      const m=plMarker({id:f.id,lat:f.lat,lon:f.lon},
+        {kind:'air',color:'var(--blue)',dashed:true,drag:!locked&&PL.tool==='select',
+         label:f.callsign+' · '+f.role,tag:'friendly'});
+      m.on('click',ev=>{L.DomEvent.stop(ev); plHit('flight',f.id,ev);});
+      m.on('dragend',ev=>{const ll=ev.target.getLatLng();
+        plPush('move flight'); f.lat=ll.lat; f.lon=ll.lng; plAll();});
+      m.addTo(PL.g.flights);
+    }
+  });
+
+  if(L1.draw) p.drawings.forEach(d=>{
+    const sel=PL.sel&&PL.sel.id===d.id;
+    const col=d.color||'var(--amber)';
+    if(d.kind==='text'){
+      L.marker([d.pts[0].lat,d.pts[0].lon],{icon:L.divIcon({className:'pl-mk',
+        html:`<span class="pl-tag" style="color:${col}">${esc(d.label)}</span>`,
+        iconSize:null,iconAnchor:[0,8]})})
+        .on('click',ev=>{L.DomEvent.stop(ev); plHit('draw',d.id,ev);})
+        .addTo(PL.g.draw);
+    } else if(d.kind==='area'){
+      L.polygon(d.pts.map(q=>[q.lat,q.lon]),{color:col,weight:sel?2.2:1.5,
+        dashArray:'5 4',fillOpacity:.07,fillColor:col})
+        .on('click',ev=>{L.DomEvent.stop(ev); plHit('draw',d.id,ev);})
+        .addTo(PL.g.draw);
+    } else {
+      L.polyline(d.pts.map(q=>[q.lat,q.lon]),{color:col,weight:sel?2.4:1.7,
+        dashArray:'5 4'})
+        .on('click',ev=>{L.DomEvent.stop(ev); plHit('draw',d.id,ev);})
+        .addTo(PL.g.draw);
+      if(d.kind==='arrow' && d.pts.length>1){
+        const a=d.pts[d.pts.length-2], b=d.pts[d.pts.length-1];
+        const th=Math.atan2(b.lat-a.lat,b.lon-a.lon), s=0.055;
+        [th+2.6,th-2.6].forEach(t=>{
+          L.polyline([[b.lat,b.lon],[b.lat+Math.sin(t)*s,b.lon+Math.cos(t)*s]],
+            {color:col,weight:1.7}).addTo(PL.g.draw);
+        });
+      }
+    }
+  });
+
+  if(PL.tmp && PL.tmp.pts.length){
+    const c=PL.tmp.what==='area'?'var(--amber)':'var(--blue)';
+    const ll=PL.tmp.pts.map(q=>[q.lat,q.lon]);
+    if(ll.length>1) L.polyline(ll,{color:c,weight:1.8,dashArray:'3 3',opacity:.85})
+      .addTo(PL.g.tmp);
+    ll.forEach(q=>L.circleMarker(q,{radius:3,color:c,weight:1.5,
+      fillColor:c,fillOpacity:.9,interactive:false}).addTo(PL.g.tmp));
+  }
+  if(PL.measure && PL.measure.a && PL.measure.b){
+    L.polyline([[PL.measure.a.lat,PL.measure.a.lng],[PL.measure.b.lat,PL.measure.b.lng]],
+      {color:'var(--amber)',weight:1.6,dashArray:'4 3'}).addTo(PL.g.tmp);
+  }
+}
+
+/* ---- tools -------------------------------------------------------------- */
+function plHint(msg){
+  const n=$p('#plHint'); if(!n) return;
+  n.textContent=msg||''; n.classList.toggle('on',!!msg);
+}
+function plTool(t){
+  if(PL.tmp) plFinishRoute();
+  PL.measure=null;
+  PL.tool=t;
+  const m=$p('#pmap');
+  if(m){ m.classList.toggle('aim', t!=='select'&&t!=='erase');
+         m.classList.toggle('kill', t==='erase'); }
+  const hints={target:'Click the map to place '+plPick().n,
+    flight:'Click to place a flight, then assign pilots in the inspector',
+    route:'Click waypoints in order. Double-click or press Enter to finish.',
+    waypoint:'Click to append a waypoint to the selected flight route',
+    area:'Click to outline an area. Double-click or Enter to close it.',
+    arrow:'Click the start, then the end',
+    text:'Click where the label should sit',
+    measure:'Click two points to measure',
+    erase:'Click an object to delete it'};
+  plHint(hints[t]||'');
+  plTools(); plDrawMap();
+}
+function plPick(){
+  return PL_UNITS.find(u=>u.n===PL.pickName) ||
+         PL_UNITS.find(u=>u.c===PL.cat) || PL_UNITS[0];
+}
+function plHit(kind,id,ev){
+  if(PL.tool==='erase'){ plDelete(kind,id); return; }
+  // A drawing tool owns the canvas: clicking a marker must drop a point on it,
+  // not hijack the gesture into a selection. Routes are drawn over targets.
+  if(PL.tool!=='select'){ if(ev&&ev.latlng) plMapClick(ev); return; }
+  PL.sel={kind,id}; plAll();
+}
+
+// Rebuilding a rail from inside a change handler can land mid-blur, and the
+// browser refuses the innerHTML write. Deferring a frame lets focus settle;
+// repeat calls in the same frame coalesce.
+let plSoonT=0;
+function plSoon(){
+  if(plSoonT) return;
+  plSoonT=requestAnimationFrame(()=>{ plSoonT=0; plAll(); });
+}
+
+function plMapClick(e){
+  const p=PL.plan, locked=p.state==='LOCKED', ll=e.latlng, t=PL.tool;
+  if(t==='select'){ PL.sel=null; plAll(); return; }
+  if(locked && t!=='measure'){ plHint('Plan is locked. Unlock to edit.'); return; }
+
+  if(t==='measure'){
+    if(!PL.measure||PL.measure.b){ PL.measure={a:ll,b:null}; plHint('Click the second point'); }
+    else { PL.measure.b=ll; plMeasureTo(ll); }
+    plDrawMap(); return;
+  }
+  if(t==='target'){
+    const u=plPick();
+    plPush('place target');
+    p.targets.push({id:plId('t-'),name:u.n,icon:u.t,cat:u.c,side:'HOSTILE',
+      threat:u.thr,status:'ACTIVE',lat:ll.lat,lon:ll.lng,note:'',assigned:null});
+    plAll(); return;
+  }
+  if(t==='flight'){
+    plPush('place flight');
+    const f=plNewFlight(); f.lat=ll.lat; f.lon=ll.lng;
+    PL.sel={kind:'flight',id:f.id}; plAll(); return;
+  }
+  if(t==='route'||t==='area'||t==='arrow'){
+    if(!PL.tmp) PL.tmp={what:t,pts:[]};
+    PL.tmp.pts.push({lat:ll.lat,lon:ll.lng});
+    if(t==='arrow'&&PL.tmp.pts.length===2){ plFinishRoute(); return; }
+    plDrawMap(); return;
+  }
+  if(t==='waypoint'){
+    const f=plSelFlight();
+    if(!f){ plHint('Select a flight first, then click to add waypoints'); return; }
+    plPush('add waypoint');
+    f.route=f.route||[];
+    f.route.push({id:plId('w-'),kind:'WP',lat:ll.lat,lon:ll.lng,alt:'',spd:'',note:''});
+    plAll(); return;
+  }
+  if(t==='text'){
+    const s=prompt('Label text'); if(!s) return;
+    plPush('add label');
+    p.drawings.push({id:plId('d-'),kind:'text',label:s,color:'var(--amber)',
+      pts:[{lat:ll.lat,lon:ll.lng}]});
+    plAll(); return;
+  }
+}
+function plMeasureTo(ll){
+  if(!PL.measure||!PL.measure.a) return;
+  const a=PL.measure.a, b=PL.measure.b||ll;
+  plHint(plDist(a,b).toFixed(1)+' NM   '+Math.round(plBrg(a,b))+'°');
+}
+function plFinishRoute(){
+  const t=PL.tmp; PL.tmp=null;
+  if(!t||t.pts.length<2){ plDrawMap(); return; }
+  const p=PL.plan;
+  if(t.what==='route'){
+    let f=plSelFlight();
+    plPush('draw route');
+    if(!f) f=plNewFlight();
+    f.route=t.pts.map((q,i)=>({id:plId('w-'),
+      kind:i===0?'WP':i===t.pts.length-1?'TARGET':'WP',
+      lat:q.lat,lon:q.lon,alt:'',spd:'',note:''}));
+    PL.sel={kind:'flight',id:f.id};
+  } else {
+    plPush('draw '+t.what);
+    p.drawings.push({id:plId('d-'),kind:t.what,pts:t.pts,label:'',
+      color:t.what==='area'?'var(--amber)':'var(--blue)'});
+  }
+  plAll();
+}
+function plNewFlight(){
+  const p=PL.plan;
+  const names=['VIPER','EAGLE','RAVEN','FALCON','HAWK','COBRA','TIGER','VAJRA'];
+  const used=new Set(p.flights.map(f=>f.callsign.split(' ')[0]));
+  const base=names.find(n=>!used.has(n))||('FLIGHT'+(p.flights.length+1));
+  const a=PL_AIR[0];
+  const f={id:plId('f-'),callsign:base+' 1-1',role:a.r[0],airframe:a.n,count:2,
+    pilots:[],targetId:null,tot:'',status:'PLANNING',note:'',route:[],lat:null,lon:null};
+  p.flights.push(f); return f;
+}
+function plSelFlight(){
+  if(!PL.sel) return null;
+  if(PL.sel.kind==='flight') return PL.plan.flights.find(f=>f.id===PL.sel.id);
+  if(PL.sel.kind==='wp') return PL.plan.flights.find(f=>f.id===PL.sel.id.split('|')[0]);
+  return null;
+}
+function plDelete(kind,id){
+  const p=PL.plan;
+  if(p.state==='LOCKED') { plHint('Plan is locked.'); return; }
+  plPush('delete');
+  if(kind==='target'){
+    p.targets=p.targets.filter(t=>t.id!==id);
+    p.flights.forEach(f=>{ if(f.targetId===id) f.targetId=null; });
+  }
+  if(kind==='flight') p.flights=p.flights.filter(f=>f.id!==id);
+  if(kind==='draw')   p.drawings=p.drawings.filter(d=>d.id!==id);
+  if(kind==='wp'){
+    const [fid,wid]=id.split('|');
+    const f=p.flights.find(x=>x.id===fid);
+    if(f) f.route=f.route.filter(w=>w.id!==wid);
+  }
+  PL.sel=null; plAll();
+}
+
+/* ---- rails -------------------------------------------------------------- */
+function plRails(){
+  const p=PL.plan;
+  // LEFT: the package. Flights first, because that is what a planner edits.
+  const fl=p.flights.map(f=>{
+    const tgt=f.targetId&&p.targets.find(t=>t.id===f.targetId);
+    const bits=[`<b>${f.count}×</b> ${esc(f.airframe)}`];
+    if(f.pilots.length) bits.push(`<b>${f.pilots.length}</b> pilot${f.pilots.length>1?'s':''}`);
+    if(tgt) bits.push('→ '+esc(tgt.name));
+    if(f.tot) bits.push('TOT <b>'+esc(f.tot)+'</b>');
+    if(f.route&&f.route.length>1) bits.push(plLegs(f.route).toFixed(0)+' NM');
+    return `<div class="pl-fl${PL.sel&&PL.sel.id===f.id?' on':''}" data-f="${f.id}">
+      <div class="top"><span class="cs">${esc(f.callsign)}</span>
+        <span class="role">${esc(f.role)}</span></div>
+      <div class="meta">${bits.join('')&&bits.map(b=>`<span>${b}</span>`).join('')}</div>
+    </div>`;
+  }).join('');
+
+  $p('#plLeft').innerHTML=`
+    <div class="pl-sec">
+      <h5>Package <button id="plAddF">+ FLIGHT</button></h5>
+      ${fl||'<div class="pl-empty">No flights yet. Add one, or pick the flight tool and place it on the map.</div>'}
+    </div>
+    <div class="pl-sec">
+      <h5>Airframes</h5>
+      ${PL_AIR.map(a=>`<div class="pl-row" data-air="${esc(a.n)}">
+        ${plSym('air','var(--ink-3)',false,15)}
+        <span class="nm">${esc(a.n)}</span>
+        <span class="sub">${esc(a.r[0])}</span></div>`).join('')}
+    </div>
+    <div class="pl-sec">
+      <h5>Pilots <button id="plRefP">${(PLDATA.pilots||[]).length} ON ROSTER</button></h5>
+      ${(PLDATA.pilots||[]).slice(0,40).map(pi=>{
+        const on=p.flights.some(f=>f.pilots.includes(pi.name));
+        return `<div class="pl-row" data-pil="${esc(pi.name)}">
+          <span class="nm" style="${on?'color:var(--ink-3)':''}">${esc(pi.name)}</span>
+          <span class="sub">${on?'ASSIGNED':esc(pi.rank||'')}</span></div>`;
+      }).join('')||'<div class="pl-empty">Roster unavailable.</div>'}
+    </div>`;
+
+  // RIGHT: inspector when something is selected, otherwise the target library.
+  if(PL.sel){ plInspector(); return; }
+  const list=PL_UNITS.filter(u=>u.c===PL.cat);
+  const count=c=>p.targets.filter(t=>t.cat===c).length;
+  $p('#plRight').innerHTML=`
+    <div class="pl-sec">
+      <h5>Target library</h5>
+      <div class="pl-cat">${PL_CATS.map(([c,l])=>
+        `<button data-cat="${c}" class="${PL.cat===c?'on':''}">${l}${count(c)?' '+count(c):''}</button>`).join('')}</div>
+      ${list.map(u=>`<div class="pl-row${PL.pickName===u.n?' on':''}" data-unit="${esc(u.n)}">
+        ${plSym(u.t,'var(--rose)',true,15)}
+        <span class="nm">${esc(u.n)}</span>
+        <span class="sub">${esc(u.thr)}</span></div>`).join('')}
+    </div>
+    <div class="pl-sec">
+      <h5>Placed <button id="plClrT">${p.targets.length?'CLEAR':''}</button></h5>
+      ${p.targets.map(t=>`<div class="pl-row" data-tgt="${t.id}">
+        ${plSym(t.icon,t.side==='HOSTILE'?'var(--rose)':'var(--blue)',true,15)}
+        <span class="nm">${esc(t.name)}</span>
+        <span class="sub">${t.assigned?'ASGN':esc(t.threat)}</span></div>`).join('')
+        ||'<div class="pl-empty">Pick a unit above, then click the map.</div>'}
+    </div>`;
+}
+
+/* ---- inspector ---------------------------------------------------------- */
+const plKv=(k,v)=>`<div class="pl-kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+const plFld=(l,inner)=>`<div class="pl-fld"><label>${l}</label>${inner}</div>`;
+const plOpt=(arr,cur)=>arr.map(o=>`<option${o===cur?' selected':''}>${esc(o)}</option>`).join('');
+
+function plInspector(){
+  const p=PL.plan, s=PL.sel, R=$p('#plRight');
+  const shell=(title,body,acts)=>{ R.innerHTML=
+    `<div class="pl-insp"><div class="hd"><span class="t">${title}</span>
+      <button id="plX" aria-label="Close">&times;</button></div>
+      <div class="bd">${body}${acts||''}</div></div>`; };
+
+  if(s.kind==='target'){
+    const t=p.targets.find(x=>x.id===s.id); if(!t){PL.sel=null;return plRails();}
+    const asg=p.flights.filter(f=>f.targetId===t.id).map(f=>f.callsign);
+    shell(esc(t.name),
+      plKv('Category',esc(t.cat))+plKv('Threat',esc(t.threat))+
+      plKv('Position',t.lat.toFixed(4)+'°N '+t.lon.toFixed(4)+'°E')+
+      plKv('Tasked by',asg.length?esc(asg.join(', ')):'&mdash;')+
+      plFld('Designation',`<input id="ti_n" value="${esc(t.name)}">`)+
+      plFld('Coalition',`<select id="ti_s">${plOpt(['HOSTILE','FRIENDLY','UNKNOWN'],t.side)}</select>`)+
+      plFld('Threat',`<select id="ti_t">${plOpt(['CRITICAL','HIGH','MED','LOW'],t.threat)}</select>`)+
+      plFld('Status',`<select id="ti_st">${plOpt(['ACTIVE','DESTROYED','SUSPECTED'],t.status)}</select>`)+
+      plFld('Notes',`<textarea id="ti_note">${esc(t.note)}</textarea>`),
+      `<div class="pl-btns"><button id="ti_center">CENTRE</button>
+        <button id="ti_dup">DUPLICATE</button>
+        <button id="ti_del" class="danger">DELETE</button></div>`);
+    const w=(el,fn)=>{const n=$p(el); if(n) n.onchange=()=>{plPush('edit target');fn(n.value);plSoon();};};
+    w('#ti_n',v=>t.name=v); w('#ti_s',v=>t.side=v);
+    w('#ti_t',v=>t.threat=v); w('#ti_st',v=>t.status=v); w('#ti_note',v=>t.note=v);
+    $p('#ti_center').onclick=()=>PL.map.setView([t.lat,t.lon],Math.max(PL.map.getZoom(),9));
+    $p('#ti_dup').onclick=()=>{plPush('duplicate');
+      p.targets.push({...t,id:plId('t-'),lat:t.lat+0.05,lon:t.lon+0.05});plAll();};
+    $p('#ti_del').onclick=()=>plDelete('target',t.id);
+  }
+
+  else if(s.kind==='flight'){
+    const f=p.flights.find(x=>x.id===s.id); if(!f){PL.sel=null;return plRails();}
+    const air=PL_AIR.find(a=>a.n===f.airframe)||PL_AIR[0];
+    const free=(PLDATA.pilots||[]).filter(pi=>!p.flights.some(x=>x.pilots.includes(pi.name)));
+    const legs=f.route&&f.route.length>1?plLegs(f.route):0;
+    shell(esc(f.callsign),
+      plKv('Airframe',f.count+'× '+esc(f.airframe))+
+      plKv('Route',f.route&&f.route.length?f.route.length+' pts · '+legs.toFixed(0)+' NM':'&mdash;')+
+      plFld('Callsign',`<input id="fi_c" value="${esc(f.callsign)}">`)+
+      plFld('Airframe',`<select id="fi_a">${plOpt(PL_AIR.map(a=>a.n),f.airframe)}</select>`)+
+      plFld('Role',`<select id="fi_r">${plOpt(air.r,f.role)}</select>`)+
+      plFld('Aircraft / TOT',`<div class="row">
+        <input id="fi_n" type="number" min="1" max="8" value="${f.count}" style="width:70px">
+        <input id="fi_t" value="${esc(f.tot)}" placeholder="19:05"></div>`)+
+      plFld('Target',`<select id="fi_g"><option value="">&mdash; none &mdash;</option>
+        ${p.targets.map(t=>`<option value="${t.id}"${f.targetId===t.id?' selected':''}>${esc(t.name)}</option>`).join('')}</select>`)+
+      plFld('Status',`<select id="fi_s">${plOpt(['PLANNING','READY','BRIEFED'],f.status)}</select>`)+
+      `<div class="pl-fld"><label>Pilots</label>
+        <select id="fi_p"><option value="">+ assign pilot</option>
+        ${free.map(pi=>`<option>${esc(pi.name)}</option>`).join('')}</select></div>
+       <div class="pl-pil">${f.pilots.map(n=>
+         `<span>${esc(n)}<b data-drop="${esc(n)}">×</b></span>`).join('')
+         ||'<span style="border:none;background:none;color:var(--ink-3)">none assigned</span>'}</div>`+
+      plFld('Notes',`<textarea id="fi_note">${esc(f.note)}</textarea>`),
+      `<div class="pl-btns"><button id="fi_fit">FOCUS</button>
+        <button id="fi_clr">CLEAR ROUTE</button>
+        <button id="fi_del" class="danger">DELETE</button></div>`);
+    const w=(el,fn)=>{const n=$p(el); if(n) n.onchange=()=>{plPush('edit flight');fn(n.value);plSoon();};};
+    w('#fi_c',v=>f.callsign=v);
+    w('#fi_a',v=>{f.airframe=v; const a=PL_AIR.find(x=>x.n===v);
+      if(a&&!a.r.includes(f.role)) f.role=a.r[0];});
+    w('#fi_r',v=>f.role=v); w('#fi_n',v=>f.count=Math.max(1,Math.min(8,+v||1)));
+    w('#fi_t',v=>f.tot=v); w('#fi_g',v=>f.targetId=v||null);
+    w('#fi_s',v=>f.status=v); w('#fi_note',v=>f.note=v);
+    const ps=$p('#fi_p');
+    if(ps) ps.onchange=()=>{ if(!ps.value) return;
+      plPush('assign pilot'); f.pilots.push(ps.value); plSoon(); };
+    R.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{
+      plPush('remove pilot'); f.pilots=f.pilots.filter(n=>n!==b.dataset.drop); plAll(); });
+    $p('#fi_fit').onclick=()=>{
+      const pts=(f.route||[]).map(w=>[w.lat,w.lon]);
+      if(f.lat!=null) pts.push([f.lat,f.lon]);
+      if(pts.length) PL.map.fitBounds(L.latLngBounds(pts).pad(0.25));
+    };
+    $p('#fi_clr').onclick=()=>{plPush('clear route'); f.route=[]; plAll();};
+    $p('#fi_del').onclick=()=>plDelete('flight',f.id);
+  }
+
+  else if(s.kind==='wp'){
+    const [fid,wid]=s.id.split('|');
+    const f=p.flights.find(x=>x.id===fid); const w=f&&(f.route||[]).find(x=>x.id===wid);
+    if(!w){PL.sel=null;return plRails();}
+    const i=f.route.indexOf(w);
+    shell('Waypoint '+String(i+1).padStart(2,'0'),
+      plKv('Flight',esc(f.callsign))+
+      plKv('Position',w.lat.toFixed(4)+'°N '+w.lon.toFixed(4)+'°E')+
+      (i>0?plKv('Leg',plDist({lat:f.route[i-1].lat,lng:f.route[i-1].lon},
+        {lat:w.lat,lng:w.lon}).toFixed(1)+' NM'):'')+
+      plFld('Type',`<select id="wi_k">${plOpt(PL_WPT,w.kind)}</select>`)+
+      plFld('Altitude / Speed',`<div class="row">
+        <input id="wi_a" value="${esc(w.alt)}" placeholder="18000 ft">
+        <input id="wi_s" value="${esc(w.spd)}" placeholder="420 kt"></div>`)+
+      plFld('Notes',`<textarea id="wi_n">${esc(w.note)}</textarea>`),
+      `<div class="pl-btns"><button id="wi_del" class="danger">DELETE</button></div>`);
+    const set=(el,fn)=>{const n=$p(el); if(n) n.onchange=()=>{plPush('edit waypoint');fn(n.value);plSoon();};};
+    set('#wi_k',v=>w.kind=v); set('#wi_a',v=>w.alt=v);
+    set('#wi_s',v=>w.spd=v); set('#wi_n',v=>w.note=v);
+    $p('#wi_del').onclick=()=>plDelete('wp',s.id);
+  }
+
+  else if(s.kind==='draw'){
+    const d=p.drawings.find(x=>x.id===s.id); if(!d){PL.sel=null;return plRails();}
+    shell(d.kind==='text'?'Label':d.kind==='area'?'Area':'Line',
+      plKv('Points',d.pts.length)+
+      (d.kind!=='text'&&d.pts.length>1?plKv('Length',plLegs(d.pts).toFixed(1)+' NM'):'')+
+      plFld('Label',`<input id="di_l" value="${esc(d.label||'')}">`)+
+      plFld('Colour',`<select id="di_c">
+        <option value="var(--amber)"${d.color==='var(--amber)'?' selected':''}>Attention</option>
+        <option value="var(--blue)"${d.color==='var(--blue)'?' selected':''}>Friendly</option>
+        <option value="var(--rose)"${d.color==='var(--rose)'?' selected':''}>Hostile</option>
+        <option value="var(--jade)"${d.color==='var(--jade)'?' selected':''}>Ready</option>
+      </select>`),
+      `<div class="pl-btns"><button id="di_del" class="danger">DELETE</button></div>`);
+    const set=(el,fn)=>{const n=$p(el); if(n) n.onchange=()=>{plPush('edit drawing');fn(n.value);plSoon();};};
+    set('#di_l',v=>d.label=v); set('#di_c',v=>d.color=v);
+    $p('#di_del').onclick=()=>plDelete('draw',d.id);
+  }
+  const x=$p('#plX'); if(x) x.onclick=()=>{PL.sel=null;plAll();};
+}
+
+/* ---- timeline ----------------------------------------------------------- */
+function plTimeline(){
+  const p=PL.plan, box=$p('#plTl');
+  const withTot=p.flights.filter(f=>plMin(f.tot)!==null);
+  if(!p.flights.length){
+    box.innerHTML='<div class="pl-empty">Add a flight to see the sequence.</div>';
+    $p('#plTlSpan').textContent=''; return;
+  }
+  const mins=withTot.map(f=>plMin(f.tot));
+  const lo=mins.length?Math.min(...mins)-25:18*60, hi=mins.length?Math.max(...mins)+20:19*60+30;
+  const span=Math.max(30,hi-lo);
+  const pct=m=>((m-lo)/span)*100;
+  $p('#plTlSpan').textContent=plHM(lo)+' – '+plHM(hi);
+
+  const ticks=[]; const step=span>180?60:span>90?30:15;
+  for(let m=Math.ceil(lo/step)*step;m<=hi;m+=step) ticks.push(m);
+
+  box.innerHTML=`<table><thead><tr><th>Flight</th><th>
+    <div class="ticks">${ticks.map(m=>
+      `<span class="lbl" style="left:${pct(m)}%">${plHM(m)}</span>`).join('')}</div>
+    </th></tr></thead><tbody>${p.flights.map(f=>{
+      const t=plMin(f.tot), sel=PL.sel&&PL.sel.id===f.id;
+      let track='';
+      ticks.forEach(m=>{track+=`<span class="grid" style="left:${pct(m)}%"></span>`;});
+      if(t!==null){
+        // Push time is inferred from route length at ~420 kt so the bar means
+        // something; without a route it is a fixed 20-minute run-in.
+        const legs=f.route&&f.route.length>1?plLegs(f.route):0;
+        const run=legs?Math.max(6,Math.round(legs/7)):20;
+        track+=`<span class="bar${sel?' on':''}" data-f="${f.id}" style="left:${pct(t-run)}%;
+          width:${Math.max(1.5,pct(t)-pct(t-run))}%" title="${esc(f.callsign)} push ${plHM(t-run)}"></span>`;
+        track+=`<span class="tot" style="left:${pct(t)}%" title="TOT ${esc(f.tot)}"></span>`;
+      }
+      return `<tr><td class="cs" data-f="${f.id}">${esc(f.callsign)}</td>
+        <td><div class="track">${track}</div></td></tr>`;
+    }).join('')}</tbody></table>`;
+  box.querySelectorAll('[data-f]').forEach(n=>n.onclick=()=>{
+    PL.sel={kind:'flight',id:n.dataset.f}; plAll(); });
+}
+
+/* ---- chrome ------------------------------------------------------------- */
+function plTools(){
+  const locked=PL.plan.state==='LOCKED';
+  $p('#plTools').innerHTML=PL_TOOLS.map(([k,t,d])=>
+    `<button data-t="${k}" title="${t}" class="${PL.tool===k?'on':''}"
+      ${locked&&k!=='select'&&k!=='measure'?'disabled':''}>
+      <svg viewBox="0 0 17 17"><path d="${d}" fill="none" stroke="currentColor"
+       stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg></button>`).join('')
+    +`<div class="div"></div>`;
+  $p('#plTools').querySelectorAll('[data-t]').forEach(b=>
+    b.onclick=()=>plTool(b.dataset.t));
+}
+function plChrome(){
+  const p=PL.plan;
+  $p('#plName').value=p.name;
+  const st=$p('#plState');
+  st.textContent=p.state;
+  st.className='pl-st'+(p.state==='READY'?' ready':p.state==='LOCKED'?' locked':'');
+  $p('#plLock').textContent=p.state==='LOCKED'?'UNLOCK':'LOCK';
+  $p('#plUndo').disabled=!PL.undo.length;
+  $p('#plRedo').disabled=!PL.redo.length;
+  const srv=$p('#plSrv');
+  if(srv) srv.textContent=(PLDATA.online?'ONLINE':'OFFLINE');
+  const hud=$p('#plHud');
+  const n=(k)=>p[k].length;
+  hud.innerHTML=`<div><span data-ll>&mdash;</span></div>
+    <div>TGT <b>${n('targets')}</b> · FLT <b>${n('flights')}</b> · DRW <b>${n('drawings')}</b></div>
+    <div class="lay">${Object.entries({bases:'Airbases',zones:'Zones',targets:'Targets',
+      flights:'Flights',routes:'Routes',draw:'Drawings'}).map(([k,l])=>
+      `<label><input type="checkbox" data-lay="${k}"${PL.lay[k]?' checked':''}>${l}</label>`).join('')}</div>`;
+  hud.querySelectorAll('[data-lay]').forEach(c=>c.onchange=()=>{
+    PL.lay[c.dataset.lay]=c.checked; plDrawMap(); });
+}
+function plAll(){ if(!PL.plan) return; plChrome(); plTools(); plRails(); plTimeline(); plDrawMap(); }
+
+/* ---- briefing ----------------------------------------------------------- */
+function plBriefText(){
+  const p=PL.plan, L=[];
+  const rule='-'.repeat(52);
+  L.push('SKYFORGE MISSION BRIEF', rule,
+    'OPERATION   '+p.name.toUpperCase(),
+    'THEATRE     '+p.theatre.toUpperCase(),
+    'STATE       '+p.state,
+    'GENERATED   '+new Date().toLocaleString(), '');
+
+  L.push('PACKAGE', rule);
+  if(!p.flights.length) L.push('  none assigned');
+  p.flights.forEach(f=>{
+    const t=f.targetId&&p.targets.find(x=>x.id===f.targetId);
+    L.push('  '+f.callsign.padEnd(12)+f.role.padEnd(11)+f.count+'x '+f.airframe);
+    if(f.pilots.length) L.push('    PILOTS   '+f.pilots.join(', '));
+    if(t)              L.push('    TARGET   '+t.name+'  ('+t.threat+' threat)');
+    if(f.tot)          L.push('    TOT      '+f.tot);
+    if(f.route&&f.route.length>1)
+      L.push('    ROUTE    '+f.route.length+' waypoints, '+plLegs(f.route).toFixed(0)+' NM');
+    if(f.note)         L.push('    NOTE     '+f.note);
+  });
+  L.push('');
+
+  L.push('TARGETS', rule);
+  if(!p.targets.length) L.push('  none placed');
+  p.targets.forEach(t=>{
+    const by=p.flights.filter(f=>f.targetId===t.id).map(f=>f.callsign);
+    L.push('  '+t.name.padEnd(18)+t.side.padEnd(10)+t.threat.padEnd(9)
+      +t.lat.toFixed(3)+'N '+t.lon.toFixed(3)+'E'
+      +(by.length?'   <- '+by.join(', '):''));
+    if(t.note) L.push('    '+t.note);
+  });
+  L.push('');
+
+  const timed=p.flights.filter(f=>plMin(f.tot)!==null)
+    .sort((a,b)=>plMin(a.tot)-plMin(b.tot));
+  if(timed.length){
+    L.push('EXECUTION', rule);
+    timed.forEach(f=>L.push('  '+f.tot+'   '+f.callsign+'  '+f.role
+      +(f.targetId?'  vs '+(p.targets.find(x=>x.id===f.targetId)||{}).name:'')));
+    L.push('');
+  }
+
+  const routed=p.flights.filter(f=>f.route&&f.route.length>1);
+  if(routed.length){
+    L.push('ROUTES', rule);
+    routed.forEach(f=>{
+      L.push('  '+f.callsign);
+      f.route.forEach((w,i)=>{
+        const nm=i>0?plDist({lat:f.route[i-1].lat,lng:f.route[i-1].lon},
+                            {lat:w.lat,lng:w.lon}).toFixed(0)+' NM':'';
+        L.push('    '+String(i+1).padStart(2,'0')+'  '+w.kind.padEnd(12)
+          +w.lat.toFixed(3)+'N '+w.lon.toFixed(3)+'E'
+          +(w.alt?'  '+w.alt:'')+(w.spd?'  '+w.spd:'')+(nm?'  '+nm:'')
+          +(w.note?'   // '+w.note:''));
+      });
+    });
+    L.push('');
+  }
+
+  const labels=p.drawings.filter(d=>d.label);
+  if(labels.length){
+    L.push('ANNOTATIONS', rule);
+    labels.forEach(d=>L.push('  '+d.kind.toUpperCase().padEnd(8)+d.label));
+    L.push('');
+  }
+  if(p.notes) L.push('NOTES', rule, '  '+p.notes.replace(/\n/g,'\n  '), '');
+  L.push(rule,'PLAN '+p.id+'  ·  v'+p.version);
+  return L.join('\n');
+}
+function plShowBrief(){
+  $p('#pbText').textContent=plBriefText();
+  $p('#pbrief').classList.add('on');
+}
+
+/* ---- open / close ------------------------------------------------------- */
+function plOpen(){
+  plInitMap();
+  if(!PL.wired){ plWire(); PL.wired=true; }
+  if(!PL.plan){
+    const want=(location.hash.match(/plan=([\w-]+)/)||[])[1];
+    PL.plan=(want&&plLoad(want)) || plBlank();
+  }
+  requestAnimationFrame(()=>{ PL.map.invalidateSize(); plAll(); });
+  plAll();
+}
+
+/* ---- data adapter -------------------------------------------------------
+   The planner reads the board's existing D object through getters and never
+   caches. That keeps one source of truth and means a poll refresh is visible
+   here without any wiring. Everything below is real: bases and zones ship in
+   live.json and zones.json, pilots come off the roster. world.units is empty
+   while the server is idle, and LIVE mode says so rather than inventing
+   contacts -- when the export starts publishing units this lights up on its
+   own. */
+const PLDATA={
+  get bases(){ return D.bases||(D.live&&D.live.world&&D.live.world.bases)||[]; },
+  get zones(){ return (D.zones&&D.zones.zones)||{}; },
+  get units(){ return (D.live&&D.live.world&&D.live.world.units)||[]; },
+  get online(){ return !!(D.status&&D.status.online); },
+  get owner(){
+    const o={}, zs=(D.campaign&&D.campaign.zones)||{};
+    Object.values(zs).forEach(z=>{ if(z&&z.name) o[z.name]=z.side; });
+    return o;
+  },
+  get pilots(){
+    const st=(D.pilots&&D.pilots.stats)||{};
+    return Object.entries(st).map(([name,v])=>{
+      const xp=(v&&typeof v==='object'&&v.XP)||0;
+      return {name,xp,rank:(typeof rankOf==='function'?rankOf(xp).ab:'')};
+    }).sort((a,b)=>b.xp-a.xp);
+  }
+};
+
+/* ---- wiring ------------------------------------------------------------- */
+function plWire(){
+  // Rails are re-rendered wholesale, so listen on the container once instead
+  // of rebinding every row on every draw.
+  $p('#plLeft').addEventListener('click',e=>{
+    const fl=e.target.closest('[data-f]');
+    if(fl){ PL.sel={kind:'flight',id:fl.dataset.f}; plAll(); return; }
+    if(e.target.id==='plAddF'){ plPush('add flight');
+      const f=plNewFlight(); PL.sel={kind:'flight',id:f.id}; plAll(); return; }
+    const air=e.target.closest('[data-air]');
+    if(air){
+      const f=plSelFlight();
+      plPush('set airframe');
+      if(f){ f.airframe=air.dataset.air;
+        const a=PL_AIR.find(x=>x.n===f.airframe);
+        if(a&&!a.r.includes(f.role)) f.role=a.r[0];
+      } else {
+        const nf=plNewFlight(); nf.airframe=air.dataset.air;
+        const a=PL_AIR.find(x=>x.n===nf.airframe); if(a) nf.role=a.r[0];
+        PL.sel={kind:'flight',id:nf.id};
+      }
+      plAll(); return;
+    }
+    const pil=e.target.closest('[data-pil]');
+    if(pil){
+      const name=pil.dataset.pil, p=PL.plan;
+      if(p.flights.some(f=>f.pilots.includes(name))){
+        plHint(name+' is already assigned'); return;
+      }
+      let f=plSelFlight();
+      plPush('assign pilot');
+      if(!f){ f=plNewFlight(); PL.sel={kind:'flight',id:f.id}; }
+      f.pilots.push(name); plAll(); return;
+    }
+  });
+
+  $p('#plRight').addEventListener('click',e=>{
+    const c=e.target.closest('[data-cat]');
+    if(c){ PL.cat=c.dataset.cat; PL.pickName=null; plRails(); return; }
+    const u=e.target.closest('[data-unit]');
+    if(u){ PL.pickName=u.dataset.unit; plTool('target'); plRails(); return; }
+    const t=e.target.closest('[data-tgt]');
+    if(t){ PL.sel={kind:'target',id:t.dataset.tgt}; plAll(); return; }
+    if(e.target.id==='plClrT'){
+      if(!PL.plan.targets.length) return;
+      if(!confirm('Remove all '+PL.plan.targets.length+' placed targets?')) return;
+      plPush('clear targets'); PL.plan.targets=[];
+      PL.plan.flights.forEach(f=>f.targetId=null);
+      PL.sel=null; plAll();
+    }
+  });
+
+  $p('#plName').onchange=e=>{ plPush('rename'); PL.plan.name=e.target.value.trim()||'UNTITLED'; plSave(); };
+  $p('#plUndo').onclick=()=>plRestore(PL.undo,PL.redo);
+  $p('#plRedo').onclick=()=>plRestore(PL.redo,PL.undo);
+  $p('#plLock').onclick=()=>{
+    plPush('lock'); const p=PL.plan;
+    p.state = p.state==='LOCKED' ? 'PLANNING' : 'LOCKED';
+    if(p.state==='LOCKED'){ PL.tool='select'; PL.tmp=null; }
+    plSave(); plAll();
+  };
+  $p('#plBrief').onclick=plShowBrief;
+  $p('#plShare').onclick=()=>{
+    plSave(true);
+    const url=location.origin+location.pathname+'#plan='+PL.plan.id;
+    const done=ok=>plHint(ok?'Link copied — the plan itself is stored in this browser'
+                            :'Copy failed: '+url);
+    if(navigator.clipboard) navigator.clipboard.writeText(url).then(()=>done(1),()=>done(0));
+    else done(0);
+  };
+  $p('#pbClose').onclick=()=>$p('#pbrief').classList.remove('on');
+  $p('#pbrief').onclick=e=>{ if(e.target.id==='pbrief') $p('#pbrief').classList.remove('on'); };
+  $p('#pbCopy').onclick=()=>{
+    const b=$p('#pbCopy');
+    if(navigator.clipboard) navigator.clipboard.writeText(plBriefText())
+      .then(()=>{b.textContent='COPIED';setTimeout(()=>b.textContent='COPY',1400);});
+  };
+  $p('#pbDl').onclick=()=>{
+    const blob=new Blob([plBriefText()],{type:'text/plain'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=PL.plan.name.replace(/[^\w-]+/g,'_')+'_brief.txt';
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  };
+  const mp=$p('#plModeP'), ml=$p('#plModeL');
+  const mode=live=>{ PL.live=live; mp.classList.toggle('on',!live);
+    ml.classList.toggle('on',live); ml.classList.toggle('live',live);
+    plHint(live?(PLDATA.units.length?'':'Server is reporting no units right now')
+              :'');
+    plDrawMap(); };
+  mp.onclick=()=>mode(false); ml.onclick=()=>mode(true);
+
+  addEventListener('keydown',e=>{
+    if(view!=='planner') return;
+    const typing=/^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName||''));
+    if(e.key==='Escape'){
+      if($p('#pbrief').classList.contains('on')) return $p('#pbrief').classList.remove('on');
+      if(PL.tmp){ PL.tmp=null; plDrawMap(); return; }
+      if(PL.sel){ PL.sel=null; plAll(); return; }
+      plTool('select'); return;
+    }
+    if(typing) return;
+    if(e.key==='Enter' && PL.tmp){ e.preventDefault(); plFinishRoute(); return; }
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){
+      e.preventDefault();
+      e.shiftKey ? plRestore(PL.redo,PL.undo) : plRestore(PL.undo,PL.redo); return;
+    }
+    if((e.key==='Delete'||e.key==='Backspace') && PL.sel){
+      e.preventDefault(); plDelete(PL.sel.kind,PL.sel.id); return;
+    }
+    const k={v:'select',t:'target',f:'flight',r:'route',w:'waypoint',
+             a:'area',m:'measure',x:'erase'}[e.key.toLowerCase()];
+    if(k) plTool(k);
+  });
+}
+
 </script>
 </body>
 </html>
