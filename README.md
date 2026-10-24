@@ -646,7 +646,8 @@ save is not touched. DCS is left stopped.
 ```powershell
 # 1. archive the published feeds (from the laptop)
 aws s3 sync s3://<board bucket>/data/ s3://<board bucket>/archive/<label>/data/ --region ap-south-2
-# 2. on the running server, via SSM
+# 2. on the running server, via SSM. Copy server\reset-stats.ps1 to C:\dcs-state first, as with
+#    the other scripts (the 2026-10-24 run sent it inline instead).
 & C:\dcs-state\reset-stats.ps1 -Label <label>
 # 3. stop the instance, THEN delete the statistics feeds from data/
 #    (pilots, pilots-seen, combat, combat-events, events, history, tacview, live
