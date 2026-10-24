@@ -275,6 +275,34 @@ if ($null -ne $state.idleSince -and $idleMinutes -ge $thresholdMinutes) {
         }
     }
 
+    # Flush the session's Tacview recording to S3 before the box goes away.
+    # Tacview only finalises the compressed .acmi when DCS exits, and once the
+    # instance stops there is nothing left running to upload it -- the file
+    # would sit on a stopped volume until the next boot, which can be days.
+    #
+    # Same rule as the report above: bounded, and never allowed to block the
+    # shutdown. Worst case we skip the flush and the next boot uploads it.
+    try {
+        $tvDir = 'C:\dcs-state\tacview'
+        if (Test-Path $tvDir) {
+            $dcs = Get-Process -Name 'DCS*' -ErrorAction SilentlyContinue
+            if ($dcs) {
+                Write-Log 'stopping DCS so Tacview finalises the recording'
+                $dcs | Stop-Process -Force
+                for ($i = 0; $i -lt 20; $i++) {
+                    Start-Sleep -Seconds 1
+                    if (-not (Get-Process -Name 'DCS*' -ErrorAction SilentlyContinue)) { break }
+                }
+            }
+            Start-Sleep -Seconds 3
+            Write-Log 'flushing Tacview recordings to S3'
+            & 'C:\dcs-state\skyforge-upload.ps1'
+            Write-Log 'Tacview flush done'
+        }
+    } catch {
+        Write-Log "Tacview flush failed: $($_.Exception.Message)"
+    }
+
     # instance_initiated_shutdown_behavior = "stop" turns this into an EC2 stop
     # rather than a terminate. If that is ever set to "terminate", this line
     # destroys the DCS install.

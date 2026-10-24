@@ -31,7 +31,18 @@
 param(
     [string]$Bucket = 'skyforge-board-123456789012',
     [string]$StateDir = 'C:\dcs-state',
-    [string]$SavedGames = 'C:\Users\Administrator\Saved Games\DCS.server'
+    [string]$SavedGames = 'C:\Users\Administrator\Saved Games\DCS.server',
+
+    # Players held back from the published roster. They keep playing and keep
+    # earning normally -- this only decides who appears on the public board.
+    # Filtered here rather than in the page, so the name never leaves the box:
+    # a browser-side filter would still ship the data and the exclusion list.
+    [string[]]$HidePilots = @('crusheR'),
+
+    # Tacview. Recordings land here, get pushed to S3, then age out locally --
+    # the game volume is the scarce one, the bucket is not.
+    [string]$TacviewDir = 'C:\dcs-state\tacview',
+    [int]$TacviewKeepDays = 14
 )
 
 $ErrorActionPreference = 'Stop'
@@ -92,7 +103,52 @@ if ($campaign) { $uploads['campaign.json'] = (Get-Content $campaign.FullName -Ra
 
 $pilots = Get-ChildItem $missionDir -Recurse -Filter 'player_stats.json' -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if ($pilots) { $uploads['pilots.json'] = (Get-Content $pilots.FullName -Raw -Encoding UTF8) }
+if ($pilots) {
+    $pilotsRaw = Get-Content $pilots.FullName -Raw -Encoding UTF8
+    if ($HidePilots -and $HidePilots.Count) {
+        # Re-serialise rather than string-edit: the roster is the one feed where
+        # a half-removed entry would still publish the XP we are hiding. If the
+        # parse fails we publish nothing rather than publish the unfiltered file.
+        try {
+            $pj = $pilotsRaw | ConvertFrom-Json
+            $dropped = 0
+            # The name is a key in more than one place: stats carries XP,
+            # config carries per-player settings, and players carries whoever
+            # is currently slotted. Dropping only stats still publishes the
+            # name, which defeats the point.
+            foreach ($n in @($HidePilots)) {
+                foreach ($section in 'stats', 'config') {
+                    $obj = $pj.$section
+                    if ($obj -and ($obj.PSObject.Properties.Name -contains $n)) {
+                        $obj.PSObject.Properties.Remove($n)
+                        $dropped++
+                    }
+                }
+            }
+            if ($pj.players) {
+                $keep = @($pj.players | Where-Object { $HidePilots -notcontains $_.name })
+                if ($keep.Count -ne @($pj.players).Count) { $dropped++ }
+                $pj.players = $keep
+            }
+            $pilotsRaw = $pj | ConvertTo-Json -Depth 12 -Compress
+
+            # Belt and braces: if the name survived anywhere in the serialised
+            # feed, withhold it rather than publish a partial redaction.
+            foreach ($n in @($HidePilots)) {
+                if ($pilotsRaw -like "*$n*") {
+                    Write-Log "pilots.json: [$n] still present after filtering, withholding the feed"
+                    $pilotsRaw = $null
+                    break
+                }
+            }
+            if ($pilotsRaw -and $dropped) { Write-Log "pilots.json: withheld $dropped record(s) from the public roster" }
+        } catch {
+            Write-Log "pilots.json filter failed, withholding the feed: $($_.Exception.Message)"
+            $pilotsRaw = $null
+        }
+    }
+    if ($pilotsRaw) { $uploads['pilots.json'] = $pilotsRaw }
+}
 
 # Zone balance is folded into status.json rather than left in campaign.json,
 # because /dcs status must answer inside Discord's 3-second interaction window.
@@ -170,6 +226,9 @@ foreach ($entry in @($names)) {
 if ($seen.Count) {
     $ordered = [ordered]@{}
     foreach ($k in ($seen.Keys | Sort-Object)) {
+        # Same withholding as the roster: last-seen would otherwise put the
+        # name straight back on the board.
+        if ($HidePilots -and ($HidePilots -contains $k)) { continue }
         $ordered[$k] = [ordered]@{
             first    = $seen[$k].first
             last     = $seen[$k].last
@@ -321,6 +380,120 @@ if (Test-Path $HashFile) {
         (Get-Content $HashFile -Raw -Encoding UTF8 | ConvertFrom-Json).PSObject.Properties |
             ForEach-Object { $hashes[$_.Name] = $_.Value }
     } catch { }
+}
+
+# --- Tacview recordings -------------------------------------------------
+# The instance is stopped most of the month, so an .acmi sitting on its disk
+# is unreachable. Push finished recordings to the same bucket the board is
+# served from, and publish an index the Files page can list.
+$TacviewSeenFile = Join-Path $StateDir 'tacview-seen.json'
+$tvSeen = @{}
+if (Test-Path $TacviewSeenFile) {
+    try {
+        (Get-Content $TacviewSeenFile -Raw -Encoding UTF8 | ConvertFrom-Json).PSObject.Properties |
+            ForEach-Object { $tvSeen[$_.Name] = [int64]$_.Value }
+    } catch { }
+}
+
+if (Test-Path $TacviewDir) {
+    $all = Get-ChildItem $TacviewDir -File -Filter '*.acmi' -ErrorAction SilentlyContinue
+
+    # Tacview writes .txt.acmi while flying and finalises a compressed
+    # .zip.acmi at mission end. Uploading the live one gives a truncated file,
+    # and uploading both gives the same sortie twice at ten times the size.
+    # A zero-byte .zip.acmi is a session Tacview never finished compressing --
+    # DCS was killed, or it died mid-flush. It must NOT shadow its raw twin,
+    # or the only surviving copy of that sortie is skipped forever.
+    $zipped = @{}
+    foreach ($f in $all) {
+        if ($f.Name -like '*.zip.acmi' -and $f.Length -gt 0) {
+            $zipped[$f.Name -replace '\.zip\.acmi$',''] = $true
+        }
+    }
+
+    # The quiet-period test exists to avoid grabbing a file DCS is still
+    # appending to. With DCS not running nothing can be mid-write, so the wait
+    # is pure delay -- and the one moment we most need the upload is the
+    # shutdown flush, where waiting costs billed minutes.
+    $dcsUp = [bool](Get-Process -Name 'DCS*' -ErrorAction SilentlyContinue)
+
+    $done = $all | Where-Object {
+        if ($dcsUp -and ((Get-Date) - $_.LastWriteTime).TotalSeconds -le 90) { return $false }
+        if ($_.Length -le 0) { return $false }
+        # Keep the raw file only when the run never produced a compressed one
+        # (server killed mid-mission) -- it is still a valid recording.
+        if ($_.Name -like '*.txt.acmi') {
+            return -not $zipped[$_.Name -replace '\.txt\.acmi$','']
+        }
+        return $true
+    }
+
+    foreach ($f in $done) {
+        # Under data/ deliberately: the instance role is scoped to
+        # s3:PutObject on <board bucket>/data/* only. A sibling tacview/
+        # prefix would need an IAM change, and the recordings are served
+        # through the same CloudFront distribution either way.
+        $key = "data/tacview/$($f.Name)"
+        if ($tvSeen[$f.Name] -eq $f.Length) { continue }
+        & $aws s3 cp $f.FullName "s3://$Bucket/$key" --region $region `
+            --content-type 'application/octet-stream' `
+            --cache-control 'public, max-age=86400' --only-show-errors
+        if ($LASTEXITCODE -eq 0) {
+            $tvSeen[$f.Name] = $f.Length
+            Write-Log "tacview: uploaded $($f.Name) ($([math]::Round($f.Length/1MB,1)) MB)"
+        } else {
+            Write-Log "tacview: upload failed for $($f.Name) (exit $LASTEXITCODE)"
+        }
+    }
+
+    # Index for the board. Newest first -- that is the one people want.
+    $idx = @($done | Sort-Object LastWriteTime -Descending | ForEach-Object {
+        [ordered]@{
+            n = $_.Name
+            b = $_.Length
+            t = [int64]([DateTimeOffset]$_.LastWriteTime).ToUnixTimeSeconds()
+        }
+    })
+    $uploads['tacview.json'] = (@{ files = $idx } | ConvertTo-Json -Depth 4 -Compress)
+
+    # Housekeeping. Only the compressed file is ever uploaded, so without this
+    # the raw twins -- roughly three times the size, one was 174 MB -- pile up
+    # on the same volume the campaign save lives on, forever.
+    $cut = (Get-Date).AddDays(-$TacviewKeepDays)
+    foreach ($f in $all) {
+        if (-not (Test-Path $f.FullName)) { continue }
+        $base = $f.Name -replace '\.(zip|txt)\.acmi$',''
+
+        # 1. Empty leftovers from a session that never flushed. Only safe with
+        #    DCS down: a live recording can sit at zero bytes with a stale
+        #    timestamp while Tacview buffers, and deleting that kills the
+        #    sortie in progress.
+        if ($f.Length -le 0) {
+            if (-not $dcsUp) {
+                Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
+                Write-Log "tacview: removed empty $($f.Name)"
+            }
+            continue
+        }
+
+        # 2. Raw file whose compressed twin is already in S3. Same sortie,
+        #    same data, a third of the size -- keeping both is pure waste.
+        if ($f.Name -like '*.txt.acmi' -and $tvSeen["$base.zip.acmi"]) {
+            Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
+            Write-Log "tacview: removed raw $($f.Name), compressed copy is in S3"
+            continue
+        }
+
+        # 3. Uploaded recordings past the retention window.
+        if ($f.LastWriteTime -lt $cut -and $tvSeen[$f.Name] -eq $f.Length) {
+            Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
+            $tvSeen.Remove($f.Name)
+            Write-Log "tacview: pruned $($f.Name) (older than $TacviewKeepDays days, safe in S3)"
+        }
+    }
+
+    [IO.File]::WriteAllText($TacviewSeenFile,
+        (($tvSeen | ConvertTo-Json -Compress)), (New-Object Text.UTF8Encoding($false)))
 }
 
 $sha = [System.Security.Cryptography.SHA256]::Create()

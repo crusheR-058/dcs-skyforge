@@ -23,8 +23,8 @@ import time
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
-
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
@@ -72,8 +72,12 @@ ALLOWED_ATTACHMENT_HOSTS = {"cdn.discordapp.com", "media.discordapp.net"}
 # default to the Lambda's own and never find the instance.
 TARGET_REGION = os.environ.get("TARGET_REGION") or os.environ["AWS_REGION"]
 
-ec2 = boto3.client("ec2", region_name=TARGET_REGION)
-ssm = boto3.client("ssm", region_name=TARGET_REGION)
+# No retries: Discord gives us 3 seconds, so boto3's default backoff (seen
+# 2026-10-14, four StartInstances attempts on InsufficientInstanceCapacity)
+# can only turn a reportable error into a silent "application did not respond".
+NO_RETRY = Config(retries={"total_max_attempts": 1})
+ec2 = boto3.client("ec2", region_name=TARGET_REGION, config=NO_RETRY)
+ssm = boto3.client("ssm", region_name=TARGET_REGION, config=NO_RETRY)
 
 # Discord interaction types
 PING = 1

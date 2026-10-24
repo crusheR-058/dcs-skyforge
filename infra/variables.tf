@@ -347,3 +347,19 @@ variable "board_url" {
   type        = string
   default     = ""
 }
+
+variable "nomad_router_deployment_arn" {
+  description = <<-EOT
+    Nomad's fine-tuned router: the on-demand custom-model deployment ARN
+    (dcs-bob config.toml, llm.router_model_id). Empty = no router permission;
+    Nomad then routes with the base model.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "nomad_router_model_arn" {
+  description = "The custom model behind that deployment (train_nomad.py status prints it)."
+  type        = string
+  default     = ""
+}

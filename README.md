@@ -44,7 +44,9 @@ An on-demand DCS World server for a small group. It boots when someone types
 >
 > **Voice:** SRS **2.3.8.2** on port 5002, matched to the client version. Clients
 > auto-connect via `DCS-SRS-AutoConnectGameGUI.lua`; `-freqs` in chat lists
-> frequencies.
+> frequencies. Server allows expansion radios, instructor mode (EAM only),
+> encryption (transmitter names off); config is `C:\SRS-Server\server.cfg` on
+> the instance (not in this repo), applied by restarting the `SRS-Server` task.
 >
 > **Verified working:** account authorized (`Login success` / `Successfully got
 > authorization data`), mission loaded, TCP+UDP 10308 reachable from the public
@@ -295,9 +297,11 @@ a name and a ucid**. Verified: 2 probe connections → reported as 0 players.
 
 ### Security note
 
-This account uses **root credentials**. Create an IAM or Identity Center user
-and use that instead — root access keys cannot be scoped or rotated cleanly, and
-this project can publish a public Lambda URL.
+Day-to-day work (Terraform, the AWS CLI, SSM) runs as an IAM user, not root.
+Root has MFA on. Checked 2026-10-24: root still holds one access key, which
+only root can delete (console, root user, Security credentials). Delete it:
+root access keys cannot be scoped or rotated cleanly, and this project can
+publish a public Lambda URL.
 
 ---
 
@@ -455,6 +459,41 @@ Once it all works, snapshot it. Rebuilding then takes 10 minutes instead of a da
 ```powershell
 aws ec2 create-image --instance-id i-0123456789abcdef0 --name "dcs-server-$(Get-Date -f yyyyMMdd)" --region ap-south-2
 ```
+
+### 7. Nomad, the voice AI
+
+Nomad answers pilots on SRS **251.0 AM**, in chat (`Nomad, picture`) and from
+the F10 menu (Other → Nomad). It can give your position, contacts and SAM
+locations, mark the map, and spawn AI fighters (only for UCIDs on its
+`spawners` list). It lives in its own project (dcs-bob) and installs like a mod:
+
+```powershell
+# 1. once: let the instance role call Bedrock and Transcribe (nothing else changes)
+terraform -chdir=infra apply -target=aws_iam_role_policy.nomad
+
+# 2. from the laptop, in dcs-bob
+.\push_to_server.ps1
+
+# 3. copy server\grpc-activate.ps1 and server\nomad-install.ps1 to C:\dcs-state
+#    (the -Eval switch is new), then once, with DCS STOPPED and the field empty:
+& C:\dcs-state\grpc-activate.ps1 -Eval
+Start-ScheduledTask -TaskName DCS-Server
+
+# 4. on the server, via SSM -- also how you update it
+& C:\dcs-state\nomad-install.ps1 -Bucket dcs-skyforge-transfer-123456789012
+```
+
+It runs as the `Nomad` task (SYSTEM, at startup) and logs to
+`C:\dcs-state\nomad.log`. Speech-to-text goes to Amazon Transcribe rather than
+running locally, because DCS needs both physical cores. Its connection to SRS
+is not a player, so the watchdog ignores it.
+
+**`-Eval` is a real trade.** Eval runs any Lua inside the mission, and this
+sandbox has `io` and `lfs` for Pretense. DCS-gRPC still listens on loopback
+only, so only processes already on this box can use it. Never open 50051.
+
+Rollback: `nomad-install.ps1 -Remove`, then `grpc-activate.ps1` (no `-Eval`)
+with DCS stopped.
 
 ---
 

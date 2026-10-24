@@ -1157,6 +1157,53 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
   .pl-hud,.pl-hint{display:none}
 }
 
+/* ---- kneeboard panel ----------------------------------------------------
+   The pages themselves are light stock because they are read in a cockpit;
+   the panel around them stays in the board's own dark register so the two
+   never get confused for one another. */
+#pkb{position:fixed;inset:0;z-index:1400;display:none;
+     background:rgba(6,9,14,.82);backdrop-filter:blur(2px)}
+#pkb.on{display:grid;place-items:center}
+#pkb .sheet{width:min(1080px,94vw);max-height:88vh;display:flex;flex-direction:column;
+     background:var(--panel);border:1px solid var(--rule-2);border-radius:var(--r)}
+#pkb .hd{display:flex;align-items:center;gap:10px;padding:12px 14px;
+     border-bottom:1px solid var(--rule)}
+#pkb .hd .t{font:600 13px/1 var(--ui);color:var(--ink)}
+#pkb .hd .n{font:500 9.5px/1 var(--mono);letter-spacing:.11em;color:var(--ink-3)}
+#pkb .hd .sp{flex:1}
+#pkb .bd{flex:1;overflow:auto;padding:14px;background:var(--graphite)}
+#pkb .note{font:400 11px/1.5 var(--ui);color:var(--ink-2);
+     padding:0 0 12px;max-width:74ch}
+#pkb .note b{color:var(--ink);font-weight:600}
+#pkb .note code{font:500 10.5px/1 var(--mono);color:var(--blue);
+     background:rgba(76,143,232,.10);padding:2px 5px;border-radius:2px}
+#pkbPages{display:grid;gap:14px;
+     grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.pkb-pg{margin:0;background:var(--slate);border:1px solid var(--rule);
+     border-radius:var(--r);overflow:hidden}
+.pkb-pg canvas{display:block;width:100%;height:auto;background:#fff}
+.pkb-pg figcaption{display:flex;align-items:center;gap:8px;padding:7px 9px;
+     border-top:1px solid var(--rule);
+     font:500 9px/1 var(--mono);letter-spacing:.08em;color:var(--ink-3)}
+.pkb-pg figcaption span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pkb-wait{font:500 10px/1 var(--mono);letter-spacing:.14em;color:var(--ink-3);
+     padding:40px;text-align:center;grid-column:1/-1}
+#pkb .ft{display:flex;gap:6px;align-items:center;padding:10px 14px;
+     border-top:1px solid var(--rule)}
+#pkb .ft .sp{flex:1}
+#pkb button,.pkb-pg figcaption button{font:500 9.5px/1 var(--mono);letter-spacing:.11em;
+     color:var(--ink-2);background:var(--raised);border:1px solid var(--rule-2);
+     border-radius:var(--r);padding:7px 11px;cursor:pointer}
+#pkb button:hover,.pkb-pg figcaption button:hover{color:var(--ink);border-color:var(--rule-hot)}
+#pkb button.hot{color:var(--blue);border-color:var(--blue-dim)}
+#pkb button:disabled{opacity:.5;cursor:default}
+#pkb select{font:500 9.5px/1 var(--mono);letter-spacing:.08em;color:var(--ink-2);
+     background:var(--raised);border:1px solid var(--rule-2);border-radius:var(--r);
+     padding:6px 8px}
+@media (max-width:640px){
+  #pkbPages{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  #pkb .sheet{width:96vw}
+}
 </style>
 </head>
 <body>
@@ -1176,7 +1223,6 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
     <nav id="views" role="tablist" aria-label="Views">
       <button class="sb on" data-v="list"    role="tab" aria-selected="true">Ops</button>
       <button class="sb"    data-v="map"     role="tab" aria-selected="false">Map</button>
-      <button class="sb"    data-v="planner" role="tab" aria-selected="false">Planner</button>
       <button class="sb"    data-v="pilots"  role="tab" aria-selected="false">Pilots</button>
       <button class="sb"    data-v="history" role="tab" aria-selected="false">Log</button>
       <button class="sb"    data-v="files"   role="tab" aria-selected="false">Files</button>
@@ -1204,48 +1250,6 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
   <div id="map" style="display:none"></div>
   <div id="panel" style="display:none"></div>
 
-<!-- ===================== MISSION PLANNER ===================== -->
-<div id="planner" role="region" aria-label="Mission planner">
-  <div class="pl-bar">
-    <div class="pl-op">
-      <span class="pl-fact">OP</span>
-      <input id="plName" value="DYNAMIC CAMPAIGN" spellcheck="false" aria-label="Operation name">
-    </div>
-    <span class="pl-fact">THEATRE<i id="plThe">CAUCASUS</i></span>
-    <span class="pl-fact">SERVER<i id="plSrv">&mdash;</i></span>
-    <span class="pl-fact">SAVED<i id="plSaved">&mdash;</i></span>
-    <span class="pl-sp"></span>
-    <span class="pl-st" id="plState">DRAFT</span>
-    <div class="pl-act">
-      <button id="plUndo" title="Undo (Ctrl+Z)">UNDO</button>
-      <button id="plRedo" title="Redo (Ctrl+Shift+Z)">REDO</button>
-      <button id="plShare" title="Copy a link that loads this plan">SHARE</button>
-      <button id="plLock">LOCK</button>
-      <button id="plBrief" class="hot">BRIEFING</button>
-    </div>
-  </div>
-
-  <div class="pl-rail l" id="plLeft"></div>
-
-  <div class="pl-stage">
-    <div id="pmap"></div>
-    <div class="pl-tools" id="plTools"></div>
-    <div class="pl-mode">
-      <button id="plModeP" class="on">PLANNED</button>
-      <button id="plModeL">LIVE</button>
-    </div>
-    <div class="pl-hud" id="plHud"></div>
-    <div class="pl-hint" id="plHint"></div>
-  </div>
-
-  <div class="pl-rail r" id="plRight"></div>
-
-  <div class="pl-time">
-    <h5>Mission timeline <i id="plTlSpan"></i></h5>
-    <div class="pl-tl" id="plTl"></div>
-  </div>
-</div>
-
 <div id="pbrief" role="dialog" aria-modal="true" aria-label="Mission briefing">
   <div class="sheet">
     <div class="hd"><span class="t">Mission briefing</span>
@@ -1254,6 +1258,34 @@ table.lb tr.pr.sel td{background:rgba(76,143,232,.13);
     <div class="ft">
       <button id="pbCopy">COPY</button>
       <button id="pbDl" class="hot">DOWNLOAD</button>
+    </div>
+  </div>
+</div>
+<div id="pkb" role="dialog" aria-modal="true" aria-label="Kneeboard pages">
+  <div class="sheet">
+    <div class="hd">
+      <span class="t">Kneeboard</span>
+      <span class="n" id="pkbCount">&mdash;</span>
+      <span class="sp"></span>
+      <button id="pkbClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="bd">
+      <p class="note">
+        Built from this plan. Put the PNGs in
+        <code>Saved Games\DCS\Kneeboard\</code> &mdash; or in a per-aircraft
+        folder inside it &mdash; then reload the mission. DCS orders pages by
+        filename, which is what the number prefixes are for.
+        <b>Pages with no data are not generated.</b>
+      </p>
+      <div id="pkbPages"></div>
+    </div>
+    <div class="ft">
+      <select id="pkbSize" title="Export resolution">
+        <option value="2">1536 &times; 2048</option>
+        <option value="1">768 &times; 1024</option>
+      </select>
+      <span class="sp"></span>
+      <button id="pkbAll" class="hot">DOWNLOAD ALL (.ZIP)</button>
     </div>
   </div>
 </div>
@@ -1440,8 +1472,11 @@ if(map.on){
   const zoomOut = () => { const n=$('#hudZ'); if(n) n.textContent = 'z'+map.getZoom(); };
   map.on('zoomend', zoomOut); map.on('load', zoomOut);
 }
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  {attribution:'&copy; OSM &copy; CARTO',subdomains:'abcd',maxZoom:18}).addTo(map);
+// OpenStreetMap's standard raster endpoint needs no API key.  CARTO's tile
+// endpoint now rejects unauthenticated requests, which left the tactical map
+// empty behind its key-required watermark.
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  {attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:19}).addTo(map);
 const gZones=L.layerGroup().addTo(map), gUnits=L.layerGroup().addTo(map),
       gTrk=L.layerGroup().addTo(map);
 let mapReady=false;
@@ -2558,6 +2593,36 @@ function renderFiles(){
           : '<span class="ask">Ask in Discord<br>for the link</span>'}</div>
       </div>`).join('')}
     </div>
+    ${(()=>{
+      const fs=((D.tacview&&D.tacview.files)||[]);
+      // No recordings is a real state, not an error: the exporter only writes
+      // a file when a mission has actually been flown and closed out.
+      const body = fs.length
+        ? fs.map(f=>{
+            const mb=(f.b/1048576).toFixed(1);
+            const when=new Date(f.t*1000);
+            // The mission name is buried in a fixed-shape filename; show it
+            // rather than making people read the timestamp prefix.
+            const m=/DCS-(?:Host-)?(.+?)\.(?:zip|txt)\.acmi$/.exec(f.n);
+            return `<div class="dlc">
+              <div class="meta">
+                <div class="n">${esc(m?m[1]:f.n)}</div>
+                <div class="d">${esc(when.toLocaleString())} &middot; ${mb} MB</div>
+              </div>
+              <div class="v">${esc(when.toLocaleDateString())}</div>
+              <div class="act"><a href="${DATA}tacview/${encodeURIComponent(f.n)}"
+                download>Download &rarr;</a></div>
+            </div>`;
+          }).join('')
+        : `<div class="dlc"><div class="meta">
+             <div class="n">No recordings yet</div>
+             <div class="d">One is written each time a mission finishes.</div>
+           </div><div class="v">--</div><div class="act"></div></div>`;
+      return `<div class="srule"><span>Flight recordings</span><i></i></div>
+        <div class="req">Open these with <b>Tacview</b>. Every mission is recorded
+          server-side, so a sortie is on here whether or not you were flying it.</div>
+        <div class="dl">${body}</div>`;
+    })()}
     <div class="srule"><span>Connection</span><i></i></div>
     <div class="dl">
       <div class="dlc"><div class="meta"><div class="n">Game server</div>
@@ -2623,13 +2688,10 @@ const PANELS={pilots:renderPilots, history:renderHistory, files:renderFiles};
 function draw(){
   renderHeader();
   syncHeaderHeight();
-  const isList=view==='list', isPlan=view==='planner',
-        isPanel=!!PANELS[view], isMap=!isList&&!isPanel&&!isPlan;
+  const isList=view==='list', isPanel=!!PANELS[view], isMap=!isList&&!isPanel;
 
   // Map draws its own world; the substrate would only sit under tiles.
-  // The planner draws its own chart, same as the map: the substrate would
-  // only sit under tiles.
-  $('#bg').style.display    = (isMap||isPlan)?'none':'block';
+  $('#bg').style.display    = isMap?'none':'block';
   // Ops runs its columns to both edges; the margin apparatus belongs to the
   // three centred document pages.
   $('#bg').classList.toggle('doc', isPanel);
@@ -2638,8 +2700,6 @@ function draw(){
   $('#list').style.display  = isList ?'grid' :'none';
   $('#map').style.display   = isMap  ?'block':'none';
   $('#panel').style.display = isPanel?'block':'none';
-  $('#planner').classList.toggle('on', isPlan);
-  if(!isPlan && typeof PL==='object') PL.visible=false;
 
   // The whole filter bar belongs to Ops. Leaving an empty strip on Map or
   // Pilots was 38px of chrome that answered nothing.
@@ -2658,7 +2718,6 @@ function draw(){
   if(view!=='pilots') pShell=false;
 
   if(isList) renderList();
-  else if(isPlan) plOpen();
   else if(isPanel) PANELS[view]();
   else { map.invalidateSize(); renderMap(intel); mapNote(); renderHud();
          if(intel) renderGci(); }
@@ -2694,6 +2753,10 @@ async function tick(){
   const cb = await grab('combat.json'); if(cb) D.combat = cb;
   const kd = await grab('combat-events.json'); if(kd) D.kd = kd;
   const fd = await grab('events.json'); if(fd) D.feed = fd;
+  // Recordings outlive the server on purpose -- the whole point is being able
+  // to watch last night's sortie while the instance is stopped. No staleness
+  // gate here, unlike live telemetry.
+  const tv = await grab('tacview.json'); if(tv) D.tacview = tv;
   D.status=st; D.campaign=cp;
   // Keep the last good copy: a 403 while the server is asleep should not blank
   // a leaderboard that is perfectly valid history.
@@ -2708,6 +2771,7 @@ async function tick(){
   // down and the planner still needs its map furniture.
   const bs = lv && lv.world && lv.world.bases;
   if(Array.isArray(bs) && bs.length) D.bases = bs;
+  if(lv && lv.env){ D.env = lv.env; D.envTs = lv.ts; }
   draw();
   $('#upd').textContent='updated '+new Date().toLocaleTimeString();
 }
@@ -2922,8 +2986,8 @@ function plInitMap(){
   PL.map=L.map('pmap',{zoomControl:false,preferCanvas:false,attributionControl:false})
         .setView([42.6,42.0],7);
   L.control.zoom({position:'bottomright'}).addTo(PL.map);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    {subdomains:'abcd',maxZoom:18}).addTo(PL.map);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {maxZoom:19}).addTo(PL.map);
   ['bases','zones','routes','targets','flights','draw','tmp'].forEach(k=>{
     PL.g[k]=L.layerGroup().addTo(PL.map);
   });
@@ -3647,7 +3711,7 @@ function plShowBrief(){
 /* ---- open / close ------------------------------------------------------- */
 function plOpen(){
   plInitMap();
-  if(!PL.wired){ plWire(); PL.wired=true; }
+  if(!PL.wired){ plWire(); kbWire(); PL.wired=true; }
   if(!PL.plan){
     const want=(location.hash.match(/plan=([\w-]+)/)||[])[1];
     PL.plan=(want&&plLoad(want)) || plBlank();
@@ -3814,6 +3878,512 @@ function plWire(){
   });
 }
 
+
+/* ---- kneeboard -----------------------------------------------------------
+   The Planner already knows the routes, the targets and the timing. DCS will
+   render any PNG dropped into  Saved Games\DCS\Kneeboard\  strapped to the
+   pilot's knee, ordered by filename. This turns the first into the second.
+
+   Pages are drawn at 768x1024 design units and the context is scaled up for
+   the export, so one layout serves both sizes. Light stock on purpose: these
+   are read in a cockpit against a bright canopy, not on this dark board.
+
+   Nothing is invented. A page whose data does not exist is not produced --
+   there is no comms card until the server actually publishes SRS frequencies,
+   because a kneeboard carrying a guessed frequency is worse than no card. */
+const KB = {
+  W:768, H:1024, M:46, FOOT:56,
+  paper:'#FFFFFF', ink:'#101418', dim:'#5A6672', rule:'#C7CFD8', rule2:'#8D99A6',
+  blue:'#1F4F86', rose:'#A82B41', amber:'#8A5D0B', jade:'#1A6B4A',
+  ui:"'Archivo',system-ui,sans-serif", mono:"'IBM Plex Mono',ui-monospace,monospace",
+  scale:2, doc:null, busy:false
+};
+
+/* Degrees decimal minutes -- what the F-16 and Hornet want typed in. */
+function kbDDM(v,isLat){
+  const h = isLat ? (v<0?'S':'N') : (v<0?'W':'E');
+  const a = Math.abs(v), d = Math.floor(a), m = (a-d)*60;
+  return h+' '+String(d).padStart(isLat?2:3,'0')+' '+m.toFixed(3).padStart(6,'0');
+}
+const kbNum = (v,n=0) => (v===null||v===undefined||v==='')?'--':(+v).toFixed(n);
+
+/* Zone ownership arrives as a DCS coalition id -- 2 blue, 1 red, 0 neutral --
+   the same mapping the map itself uses. Targets, which the planner authors
+   rather than the server, carry a word instead. One helper reads both so a
+   change of source cannot silently turn an airfield neutral. */
+function kbSide(v){
+  if(v===2||/^(blue|friendly)$/i.test(v))  return {label:'BLUE',    col:KB.blue};
+  if(v===1||/^(red|hostile)$/i.test(v))    return {label:'RED',     col:KB.rose};
+  if(v===0||/^neutral$/i.test(v))          return {label:'NEUTRAL', col:KB.dim};
+  return {label:'--', col:KB.dim};
+}
+
+/* ---- page primitives ---------------------------------------------------- */
+function kbText(p,s,x,y,o){
+  o=o||{};
+  p.x.font=`${o.w||400} ${o.sz||11}px ${o.f||KB.mono}`;
+  p.x.fillStyle=o.col||KB.ink;
+  p.x.textAlign=o.al||'left';
+  p.x.fillText(String(s),x,y);
+  p.x.textAlign='left';
+}
+function kbRule(p,y,col,w){
+  p.x.strokeStyle=col||KB.rule; p.x.lineWidth=w||1;
+  p.x.beginPath(); p.x.moveTo(KB.M,y+.5); p.x.lineTo(KB.W-KB.M,y+.5); p.x.stroke();
+}
+/* Wrap on width, return the y after the last line. */
+function kbWrap(p,s,x,y,maxW,o){
+  o=o||{}; const lh=o.lh||14;
+  p.x.font=`${o.w||400} ${o.sz||10}px ${o.f||KB.mono}`;
+  p.x.fillStyle=o.col||KB.dim;
+  let line='';
+  String(s).split(/\s+/).forEach(word=>{
+    const t=line?line+' '+word:word;
+    if(p.x.measureText(t).width>maxW && line){ p.x.fillText(line,x,y); y+=lh; line=word; }
+    else line=t;
+  });
+  if(line){ p.x.fillText(line,x,y); y+=lh; }
+  return y;
+}
+
+function kbHead(p,title,sub){
+  const y=KB.M;
+  kbText(p,(PL.plan.name||'UNTITLED').toUpperCase(),KB.M,y,
+    {f:KB.ui,sz:13,w:700,col:KB.ink});
+  kbText(p,'SKYFORGE',KB.W-KB.M,y,{sz:9,w:600,col:KB.blue,al:'right'});
+  kbRule(p,y+9,KB.ink,1.6);
+  kbText(p,title.toUpperCase(),KB.M,y+30,{f:KB.ui,sz:19,w:700});
+  if(sub) kbText(p,sub.toUpperCase(),KB.W-KB.M,y+30,{sz:10,col:KB.dim,al:'right'});
+  p.y = y+46;
+}
+function kbFoot(p,n,of){
+  const y=KB.H-30;
+  kbRule(p,y-14);
+  kbText(p,PL.plan.id+'  v'+PL.plan.version,KB.M,y,{sz:8,col:KB.dim});
+  kbText(p,p.stamp,KB.W/2,y,{sz:8,col:KB.dim,al:'center'});
+  kbText(p,n+' / '+of,KB.W-KB.M,y,{sz:8,col:KB.dim,al:'right'});
+}
+
+/* A titled band. Everything on these pages hangs off one of these. */
+function kbSect(p,label){
+  p.y+=10;
+  kbText(p,label.toUpperCase(),KB.M,p.y,{sz:9,w:600,col:KB.blue});
+  kbRule(p,p.y+6,KB.rule2);
+  p.y+=20;
+}
+/* key/value rows, two per line where they fit */
+function kbKV(p,pairs){
+  const colW=(KB.W-KB.M*2)/2;
+  pairs.forEach((kv,i)=>{
+    const c=i%2, x=KB.M+c*colW;
+    if(c===0 && i) p.y+=17;
+    kbText(p,kv[0].toUpperCase(),x,p.y,{sz:8,col:KB.dim});
+    kbText(p,kv[1],x+96,p.y,{sz:11,w:500,col:kv[2]||KB.ink});
+  });
+  p.y+=24;
+}
+function kbTable(p,cols,rows,o){
+  o=o||{};
+  const x0=KB.M;
+  let x=x0;
+  cols.forEach(c=>{ kbText(p,c.t,c.al==='right'?x+c.w-4:x,p.y,
+    {sz:8,w:600,col:KB.dim,al:c.al||'left'}); x+=c.w; });
+  kbRule(p,p.y+6,KB.rule2,1.2);
+  p.y+=19;
+  rows.forEach(r=>{
+    x=x0;
+    r.forEach((cell,i)=>{
+      const c=cols[i], v=Array.isArray(cell)?cell[0]:cell, col=Array.isArray(cell)?cell[1]:null;
+      kbText(p,v,c.al==='right'?x+c.w-4:x,p.y,
+        {sz:o.sz||10,w:i===0?600:400,col:col||KB.ink,al:c.al||'left'});
+      x+=c.w;
+    });
+    kbRule(p,p.y+5);
+    p.y+=(o.rh||18);
+  });
+}
+
+/* ---- document ----------------------------------------------------------- */
+function kbDoc(){
+  const stamp=new Date().toLocaleString();
+  return {
+    pages:[], stamp,
+    start(name,title,sub){
+      const c=document.createElement('canvas');
+      c.width=KB.W*KB.scale; c.height=KB.H*KB.scale;
+      const x=c.getContext('2d');
+      x.scale(KB.scale,KB.scale);
+      x.fillStyle=KB.paper; x.fillRect(0,0,KB.W,KB.H);
+      x.textBaseline='alphabetic';
+      const p={c,x,y:KB.M,name,stamp};
+      kbHead(p,title,sub);
+      this.pages.push(p); this.cur=p;
+      return p;
+    },
+    // Start a continuation page when the next block will not fit.
+    need(h,name,title,sub){
+      if(this.cur.y+h > KB.H-KB.FOOT) this.start(name,title,sub);
+      return this.cur;
+    }
+  };
+}
+
+/* ---- the pages ---------------------------------------------------------- */
+function kbMission(d){
+  const pl=PL.plan, p=d.start('MISSION','Mission','sheet 1');
+  const own=PLDATA.owner, zs=Object.values(own);
+  const blue=zs.filter(s=>kbSide(s).label==='BLUE').length;
+  const red =zs.filter(s=>kbSide(s).label==='RED').length;
+
+  kbSect(p,'Operation');
+  kbKV(p,[
+    ['Operation',pl.name||'UNTITLED'],
+    ['Theatre',pl.theatre||'Caucasus'],
+    ['State',pl.state,pl.state==='LOCKED'?KB.rose:pl.state==='READY'?KB.jade:KB.ink],
+    ['Generated',d.stamp]
+  ]);
+
+  // Fresh weather when the server is up; otherwise the last report, with its
+  // age on the page. A kneeboard carrying an unlabelled stale QNH is a trap.
+  const fresh=!!(D.live&&D.live.env);
+  const e=fresh?D.live.env:(D.env||null);
+  const age=(!fresh&&D.envTs)?(Date.now()/1000-D.envTs):null;
+  if(e){
+    kbSect(p,'Conditions'+(fresh?'':' — last report'));
+    const kt=Math.round((e.windMs||0)*1.94384);
+    const mt=(e.hh!=null&&e.mm!=null)
+      ? String(e.hh).padStart(2,'0')+':'+String(e.mm).padStart(2,'0') : '--';
+    const dt=(e.day&&e.mon)
+      ? String(e.day).padStart(2,'0')+'/'+String(e.mon).padStart(2,'0')+'/'+(e.yr||'') : '--';
+    kbKV(p,[
+      ['Mission time',mt],
+      ['Date',dt],
+      ['QNH',e.qnh?('Q'+e.qnh+' hPa'):'--'],
+      ['Temp',e.tempC!=null?(Math.round(e.tempC)+' C'):'--'],
+      ['Wind',(e.windDir!=null?String(e.windDir).padStart(3,'0'):'---')+' / '+kt+' kt'],
+      ['Reported',fresh?'live':(age!=null?(typeof ago==='function'?ago(age):'stale')+' ago':'unknown'),
+        fresh?KB.jade:KB.amber]
+    ]);
+  }
+
+  kbSect(p,'Campaign');
+  kbKV(p,[
+    ['Zones held',String(blue),KB.blue],
+    ['Hostile',String(red),KB.rose],
+    ['Airfields',String(PLDATA.bases.length)],
+    ['Pilots online',String(PLDATA.players||0)]
+  ]);
+
+  kbSect(p,'Package');
+  const pilots=pl.flights.reduce((n,f)=>n+f.pilots.length,0);
+  kbKV(p,[
+    ['Flights',String(pl.flights.length)],
+    ['Aircraft',String(pl.flights.reduce((n,f)=>n+(+f.count||0),0))],
+    ['Pilots assigned',String(pilots)],
+    ['Targets',String(pl.targets.length)]
+  ]);
+
+  if(pl.notes){
+    kbSect(p,'Notes');
+    p.y=kbWrap(p,pl.notes,KB.M,p.y,KB.W-KB.M*2,{sz:10,lh:15,col:KB.ink});
+  }
+}
+
+function kbPackage(d){
+  const pl=PL.plan;
+  if(!pl.flights.length) return;
+  const cols=[{t:'CALLSIGN',w:104},{t:'TYPE',w:92},{t:'ROLE',w:78},
+              {t:'TOT',w:56},{t:'TARGET',w:132},{t:'N',w:24,al:'right'}];
+  let p=d.start('PACKAGE','Package','flights');
+  kbSect(p,'Assigned flights');
+  const rows=pl.flights.map(f=>{
+    const t=f.targetId&&pl.targets.find(x=>x.id===f.targetId);
+    return [f.callsign,f.airframe,f.role,f.tot||'--',t?t.name:'--',String(f.count)];
+  });
+  kbTable(p,cols,rows);
+
+  const withP=pl.flights.filter(f=>f.pilots.length);
+  if(withP.length){
+    p=d.need(40+withP.length*16,'PACKAGE','Package','flights');
+    kbSect(p,'Aircrew');
+    withP.forEach(f=>{
+      p=d.need(20,'PACKAGE','Package','flights');
+      kbText(p,f.callsign,KB.M,p.y,{sz:10,w:600});
+      kbText(p,f.pilots.join(', '),KB.M+104,p.y,{sz:10,col:KB.dim});
+      p.y+=16;
+    });
+  }
+
+  const timed=pl.flights.filter(f=>plMin(f.tot)!==null)
+    .sort((a,b)=>plMin(a.tot)-plMin(b.tot));
+  if(timed.length){
+    p=d.need(46+timed.length*18,'PACKAGE','Package','flights');
+    kbSect(p,'Execution');
+    kbTable(p,[{t:'TOT',w:64},{t:'CALLSIGN',w:112},{t:'ROLE',w:96},{t:'TASK',w:214}],
+      timed.map(f=>{
+        const t=f.targetId&&pl.targets.find(x=>x.id===f.targetId);
+        return [f.tot,f.callsign,f.role,t?('vs '+t.name):'--'];
+      }));
+  }
+}
+
+function kbRoutes(d){
+  const pl=PL.plan;
+  pl.flights.filter(f=>f.route&&f.route.length>1).forEach(f=>{
+    const nm='ROUTE_'+String(f.callsign||'FLIGHT').replace(/[^\w-]+/g,'_').toUpperCase();
+    let p=d.start(nm,f.callsign,f.role+'  '+f.count+'x '+f.airframe);
+    const t=f.targetId&&pl.targets.find(x=>x.id===f.targetId);
+    kbSect(p,'Flight');
+    kbKV(p,[
+      ['Airframe',f.count+'x '+f.airframe],
+      ['Role',f.role],
+      ['TOT',f.tot||'--'],
+      ['Target',t?t.name:'--',t?KB.rose:KB.ink],
+      ['Pilots',f.pilots.length?f.pilots.join(', '):'--'],
+      ['Total',plLegs(f.route).toFixed(0)+' NM']
+    ]);
+
+    kbSect(p,'Route');
+    const cols=[{t:'#',w:26},{t:'TYPE',w:84},{t:'LATITUDE',w:104},{t:'LONGITUDE',w:112},
+                {t:'ALT',w:60,al:'right'},{t:'SPD',w:52,al:'right'},
+                {t:'LEG',w:46,al:'right'},{t:'BRG',w:38,al:'right'}];
+    let x=KB.M;
+    cols.forEach(c=>{ kbText(p,c.t,c.al==='right'?x+c.w-4:x,p.y,
+      {sz:8,w:600,col:KB.dim,al:c.al||'left'}); x+=c.w; });
+    kbRule(p,p.y+6,KB.rule2,1.2); p.y+=19;
+
+    f.route.forEach((w,i)=>{
+      p=d.need(22,nm,f.callsign,'route cont.');
+      const prev=i>0?f.route[i-1]:null;
+      const leg=prev?plDist({lat:prev.lat,lng:prev.lon},{lat:w.lat,lng:w.lon}):null;
+      const brg=prev?plBrg({lat:prev.lat,lng:prev.lon},{lat:w.lat,lng:w.lon}):null;
+      const cells=[String(i+1).padStart(2,'0'),w.kind,kbDDM(w.lat,1),kbDDM(w.lon,0),
+        w.alt||'--',w.spd||'--',leg==null?'--':leg.toFixed(0),
+        brg==null?'--':String(Math.round(brg)).padStart(3,'0')];
+      let cx=KB.M;
+      cells.forEach((v,j)=>{
+        const c=cols[j];
+        kbText(p,v,c.al==='right'?cx+c.w-4:cx,p.y,
+          {sz:10,w:j===0?600:400,col:w.kind==='TARGET'?KB.rose:KB.ink,al:c.al||'left'});
+        cx+=c.w;
+      });
+      // The note belongs to the waypoint above it, so it goes inside the row
+      // and the rule closes the row after it. Ruling first reads as the note
+      // belonging to the waypoint below.
+      p.y+=13;
+      if(w.note){
+        kbText(p,w.note,KB.M+26,p.y,{sz:9,col:KB.dim}); p.y+=13;
+      }
+      kbRule(p,p.y-6); p.y+=5;
+    });
+
+    if(f.note){
+      p=d.need(46,nm,f.callsign,'route cont.');
+      kbSect(p,'Remarks');
+      p.y=kbWrap(p,f.note,KB.M,p.y,KB.W-KB.M*2,{sz:10,lh:15,col:KB.ink});
+    }
+  });
+}
+
+function kbTargets(d){
+  const pl=PL.plan;
+  if(!pl.targets.length) return;
+  let p=d.start('TARGETS','Targets','target cards');
+  kbSect(p,'Assigned targets');
+  pl.targets.forEach(t=>{
+    p=d.need(96,'TARGETS','Targets','cont.');
+    const by=pl.flights.filter(f=>f.targetId===t.id).map(f=>f.callsign);
+    const sd=kbSide(t.side), col=sd.col;
+    kbText(p,t.name,KB.M,p.y,{f:KB.ui,sz:13,w:700});
+    kbText(p,(t.threat||'')+' THREAT',KB.W-KB.M,p.y,{sz:9,w:600,col,al:'right'});
+    p.y+=17;
+    kbText(p,'LAT',KB.M,p.y,{sz:8,col:KB.dim});
+    kbText(p,kbDDM(t.lat,1),KB.M+40,p.y,{sz:11,w:500});
+    kbText(p,'LON',KB.M+200,p.y,{sz:8,col:KB.dim});
+    kbText(p,kbDDM(t.lon,0),KB.M+240,p.y,{sz:11,w:500});
+    p.y+=16;
+    kbText(p,'DD',KB.M,p.y,{sz:8,col:KB.dim});
+    kbText(p,kbNum(t.lat,5)+'  '+kbNum(t.lon,5),KB.M+40,p.y,{sz:10,col:KB.dim});
+    kbText(p,'SIDE',KB.M+200,p.y,{sz:8,col:KB.dim});
+    kbText(p,sd.label,KB.M+240,p.y,{sz:10,col});
+    p.y+=16;
+    kbText(p,'TASKED',KB.M,p.y,{sz:8,col:KB.dim});
+    kbText(p,by.length?by.join(', '):'unassigned',KB.M+70,p.y,
+      {sz:10,col:by.length?KB.ink:KB.dim});
+    p.y+=15;
+    if(t.note) p.y=kbWrap(p,t.note,KB.M,p.y,KB.W-KB.M*2,{sz:9,lh:13});
+    p.y+=6; kbRule(p,p.y,KB.rule2); p.y+=18;
+  });
+}
+
+function kbAirfields(d){
+  const bases=PLDATA.bases.filter(b=>b&&b.lat!=null&&!plIsShip(b.n));
+  if(!bases.length) return;
+  const own=PLDATA.owner;
+  const cols=[{t:'AIRFIELD',w:210},{t:'HELD',w:78},{t:'LATITUDE',w:118},{t:'LONGITUDE',w:130}];
+  let p=d.start('AIRFIELDS','Airfields','theatre');
+  kbSect(p,'Airfields — '+(PL.plan.theatre||'Caucasus'));
+  let x=KB.M;
+  cols.forEach(c=>{ kbText(p,c.t,x,p.y,{sz:8,w:600,col:KB.dim}); x+=c.w; });
+  kbRule(p,p.y+6,KB.rule2,1.2); p.y+=19;
+
+  bases.slice().sort((a,b)=>String(a.n).localeCompare(String(b.n))).forEach(b=>{
+    if(p.y+20>KB.H-KB.FOOT){
+      p=d.start('AIRFIELDS','Airfields','cont.');
+      let hx=KB.M; p.y+=4;
+      cols.forEach(c=>{ kbText(p,c.t,hx,p.y,{sz:8,w:600,col:KB.dim}); hx+=c.w; });
+      kbRule(p,p.y+6,KB.rule2,1.2); p.y+=19;
+    }
+    const z=plBaseZone(b.n,own);
+    const sd=kbSide(z?own[z]:null);
+    let cx=KB.M;
+    [[b.n,KB.ink],[sd.label,sd.col],
+     [kbDDM(b.lat,1),KB.ink],[kbDDM(b.lon,0),KB.ink]]
+      .forEach((cell,i)=>{ kbText(p,cell[0],cx,p.y,
+        {sz:10,w:i===0?600:400,col:cell[1]}); cx+=cols[i].w; });
+    kbRule(p,p.y+5); p.y+=18;
+  });
+}
+
+function kbComms(d){
+  const srs=(D.live&&D.live.env&&D.live.env.srs)||[];
+  if(!srs.length) return;               // no card rather than a guessed one
+  const p=d.start('COMMS','Comms','SRS');
+  kbSect(p,'SRS frequencies');
+  kbTable(p,[{t:'CHANNEL',w:250},{t:'FREQUENCY',w:150},{t:'MOD',w:90}],
+    srs.map(s=>[s.name||s.label||'--',
+                s.freq!=null?(+s.freq).toFixed(3):'--',
+                (s.mod||s.modulation||'--')]));
+}
+
+/* ---- build / export ----------------------------------------------------- */
+async function kbBuild(){
+  // Canvas will silently fall back to a default face if the webfont has not
+  // been rasterised yet, and the whole point of these pages is legibility.
+  try{
+    await document.fonts.ready;
+    await Promise.all([
+      document.fonts.load('700 19px Archivo'),
+      document.fonts.load('600 11px "IBM Plex Mono"'),
+      document.fonts.load('400 10px "IBM Plex Mono"')
+    ]);
+  }catch(e){}
+
+  const d=kbDoc();
+  kbMission(d); kbPackage(d); kbRoutes(d); kbTargets(d); kbAirfields(d); kbComms(d);
+  d.pages.forEach((p,i)=>kbFoot(p,i+1,d.pages.length));
+  // Numbered so DCS, which sorts by filename, shows them in briefing order.
+  d.pages.forEach((p,i)=>{
+    p.file=String(i+1).padStart(2,'0')+'_'+p.name+'.png';
+  });
+  KB.doc=d;
+  return d;
+}
+
+const KB_CRC=(()=>{
+  const t=new Uint32Array(256);
+  for(let i=0;i<256;i++){ let c=i;
+    for(let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1;
+    t[i]=c>>>0; }
+  return b=>{ let c=0xFFFFFFFF;
+    for(let i=0;i<b.length;i++) c=t[(c^b[i])&255]^(c>>>8);
+    return (c^0xFFFFFFFF)>>>0; };
+})();
+
+/* Store-only ZIP. No compression: PNG is already deflated, so all a
+   compressor would buy is a dependency. */
+function kbZip(files){
+  const enc=new TextEncoder(), parts=[], cdir=[];
+  const u16=v=>[v&255,(v>>8)&255];
+  const u32=v=>[v&255,(v>>8)&255,(v>>16)&255,(v>>24)&255];
+  let off=0;
+  files.forEach(f=>{
+    const nm=enc.encode(f.name), crc=KB_CRC(f.data), n=f.data.length;
+    const lh=new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0),...u16(0),
+      ...u16(0),...u16(0),...u32(crc),...u32(n),...u32(n),...u16(nm.length),...u16(0)]);
+    parts.push(lh,nm,f.data);
+    cdir.push({nm,crc,n,off});
+    off+=lh.length+nm.length+n;
+  });
+  const start=off;
+  cdir.forEach(e=>{
+    const ch=new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0),
+      ...u16(0),...u16(0),...u16(0),...u32(e.crc),...u32(e.n),...u32(e.n),
+      ...u16(e.nm.length),...u16(0),...u16(0),...u16(0),...u16(0),
+      ...u32(0),...u32(e.off)]);
+    parts.push(ch,e.nm); off+=ch.length+e.nm.length;
+  });
+  parts.push(new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),
+    ...u16(cdir.length),...u16(cdir.length),...u32(off-start),...u32(start),...u16(0)]));
+  return new Blob(parts,{type:'application/zip'});
+}
+
+const kbBlob=p=>new Promise(r=>p.c.toBlob(r,'image/png'));
+function kbSaveBlob(blob,name){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+
+/* ---- panel -------------------------------------------------------------- */
+async function kbOpen(){
+  if(KB.busy) return;
+  KB.busy=true;
+  const wrap=$p('#pkbPages');
+  wrap.innerHTML='<div class="pkb-wait">RENDERING…</div>';
+  $p('#pkb').classList.add('on');
+  try{
+    const d=await kbBuild();
+    wrap.innerHTML='';
+    d.pages.forEach(p=>{
+      const fig=document.createElement('figure');
+      fig.className='pkb-pg';
+      p.c.style.width='100%'; p.c.style.height='auto';
+      fig.appendChild(p.c);
+      const cap=document.createElement('figcaption');
+      cap.innerHTML=`<span>${esc(p.file)}</span>`;
+      const b=document.createElement('button');
+      b.textContent='PNG';
+      b.onclick=async()=>kbSaveBlob(await kbBlob(p),p.file);
+      cap.appendChild(b);
+      fig.appendChild(cap);
+      wrap.appendChild(fig);
+    });
+    $p('#pkbCount').textContent=d.pages.length+(d.pages.length===1?' PAGE':' PAGES');
+  }catch(e){
+    wrap.innerHTML='<div class="pkb-wait">Could not build the pages: '+esc(e.message)+'</div>';
+  }
+  KB.busy=false;
+}
+
+async function kbDownloadAll(){
+  const d=KB.doc; if(!d||!d.pages.length) return;
+  const btn=$p('#pkbAll'), was=btn.textContent;
+  btn.textContent='PACKING…'; btn.disabled=true;
+  try{
+    const files=[];
+    for(const p of d.pages){
+      const blob=await kbBlob(p);
+      files.push({name:p.file,data:new Uint8Array(await blob.arrayBuffer())});
+    }
+    const safe=(PL.plan.name||'plan').replace(/[^\w-]+/g,'_');
+    kbSaveBlob(kbZip(files),safe+'_kneeboard.zip');
+  } finally { btn.textContent=was; btn.disabled=false; }
+}
+
+function kbWire(){
+  $p('#plKneeb').onclick=kbOpen;
+  $p('#pkbClose').onclick=()=>$p('#pkb').classList.remove('on');
+  $p('#pkb').onclick=e=>{ if(e.target.id==='pkb') $p('#pkb').classList.remove('on'); };
+  $p('#pkbAll').onclick=kbDownloadAll;
+  $p('#pkbSize').onchange=e=>{ KB.scale=+e.target.value; kbOpen(); };
+  // Capture, so Escape closes this panel instead of clearing the map selection.
+  addEventListener('keydown',e=>{
+    if(e.key==='Escape' && $p('#pkb').classList.contains('on')){
+      e.stopPropagation(); $p('#pkb').classList.remove('on');
+    }
+  },true);
+}
 </script>
 </body>
 </html>

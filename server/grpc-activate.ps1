@@ -32,6 +32,12 @@ param(
     [string]$DcsPath    = 'C:\DCS_server',
     [string]$StateDir   = 'C:\dcs-state',
     [switch]$Deactivate,
+    # Nomad (the dcs-bob voice AI) runs its fixed Lua snippets through Eval.
+    # Without this switch every run writes evalEnabled = false again.
+    [switch]$Eval,
+    # Add only the DCS-gRPC line and leave DCS's sandbox (io, lfs) locked: no
+    # Pretense saving. Without it, activation insists on the de-sanitised file.
+    [switch]$Sanitized,
     [switch]$Force
 )
 
@@ -156,13 +162,13 @@ if ($ms -like '*grpc-mission.lua*') {
     # silently would wipe progress, so assert it survived the edit.
     $ioOk  = $patched -match '--\s*sanitizeModule\(''io''\)'
     $lfsOk = $patched -match '--\s*sanitizeModule\(''lfs''\)'
-    if (-not ($ioOk -and $lfsOk)) {
+    if (-not $Sanitized -and -not ($ioOk -and $lfsOk)) {
         Write-Log "  FATAL: Pretense de-sanitisation missing after patch (io=$ioOk lfs=$lfsOk) -- aborting"
         exit 1
     }
 
     [IO.File]::WriteAllText($MsPath, $patched)
-    Write-Log '  patched MissionScripting.lua (grpc dofile added before sanitisation)'
+    Write-Log "  patched MissionScripting.lua (grpc dofile added before sanitisation; io/lfs $(if ($ioOk -and $lfsOk) { 'open for Pretense' } else { 'locked' }))"
 }
 
 # 3. config
@@ -180,13 +186,17 @@ autostart = true
 host = "127.0.0.1"
 port = 50051
 
--- Eval executes arbitrary Lua inside the mission environment. Nothing here
--- needs it, and this server's Lua sandbox is already de-sanitised for Pretense.
+-- Eval executes arbitrary Lua inside the mission environment (and, when the
+-- sandbox is opened for Pretense, io and lfs too). Off unless
+-- grpc-activate.ps1 -Eval (for Nomad); either way only processes on this box
+-- can reach it, because host is loopback.
 evalEnabled = false
 
 debug = false
 throughputLimit = 600
 '@
+
+if ($Eval) { $cfgBody = $cfgBody -replace '(?m)^evalEnabled = false', 'evalEnabled = true' }
 
 # ASCII, NOT Set-Content -Encoding UTF8. On PowerShell 5.1 that emits a BOM,
 # and DCS-gRPC's hook loadstring()s this file and dies on it with
@@ -196,7 +206,7 @@ throughputLimit = 600
 # with the server stopped -- a write attempt against a live server fails with
 # "being used by another process", silently if you do not check.
 [IO.File]::WriteAllText((Join-Path $cfgDir 'dcs-grpc.lua'), $cfgBody, [Text.Encoding]::ASCII)
-Write-Log '  wrote Config\dcs-grpc.lua (autostart, loopback only, eval off)'
+Write-Log "  wrote Config\dcs-grpc.lua (autostart, loopback only, eval $(if ($Eval) { 'ON' } else { 'off' }))"
 
 # 4. report
 Write-Log '=== installed. Verify after the next DCS start: ==='

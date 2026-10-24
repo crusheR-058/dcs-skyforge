@@ -30,7 +30,6 @@ param(
     [Parameter(Mandatory)][string]$ModName,
     [string]$SavedGames = 'C:\Users\Administrator\Saved Games\DCS.server'
 )
-
 $ErrorActionPreference = 'Stop'
 
 $LogFile = 'C:\dcs-state\install-mod.log'
