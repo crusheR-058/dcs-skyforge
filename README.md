@@ -637,17 +637,18 @@ foreach ($p in $r.PriceList) {
 
 ## Resetting pilot statistics
 
-`servereset-stats.ps1` archives and clears every statistic the board and the
+`server\reset-stats.ps1` archives and clears every statistic the board and the
 VIAF Ops app show: XP and ranks, sorties and landings, kills and traps, the event
 feed, campaign history, pilot presence and Tacview recordings. It moves files
-into `C:\dcs-staterchive\<label>\`; nothing is deleted. The Pretense campaign
+into `C:\dcs-state\archive\<label>\`; nothing is deleted. The Pretense campaign
 save is not touched. DCS is left stopped.
 
 ```powershell
 # 1. archive the published feeds (from the laptop)
 aws s3 sync s3://<board bucket>/data/ s3://<board bucket>/archive/<label>/data/ --region ap-south-2
 # 2. on the running server, via SSM
-& C:\dcs-stateeset-stats.ps1 -Label <label>
+& C:\dcs-state
+eset-stats.ps1 -Label <label>
 # 3. stop the instance, THEN delete the statistics feeds from data/
 #    (pilots, pilots-seen, combat, combat-events, events, history, tacview, live
 #    and data/tacview/*). Keep zones.json, zones-raw.json, campaign.json and
