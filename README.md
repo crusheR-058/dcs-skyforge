@@ -635,6 +635,28 @@ foreach ($p in $r.PriceList) {
 
 ---
 
+## Resetting pilot statistics
+
+`servereset-stats.ps1` archives and clears every statistic the board and the
+VIAF Ops app show: XP and ranks, sorties and landings, kills and traps, the event
+feed, campaign history, pilot presence and Tacview recordings. It moves files
+into `C:\dcs-staterchive\<label>\`; nothing is deleted. The Pretense campaign
+save is not touched. DCS is left stopped.
+
+```powershell
+# 1. archive the published feeds (from the laptop)
+aws s3 sync s3://<board bucket>/data/ s3://<board bucket>/archive/<label>/data/ --region ap-south-2
+# 2. on the running server, via SSM
+& C:\dcs-stateeset-stats.ps1 -Label <label>
+# 3. stop the instance, THEN delete the statistics feeds from data/
+#    (pilots, pilots-seen, combat, combat-events, events, history, tacview, live
+#    and data/tacview/*). Keep zones.json, zones-raw.json, campaign.json and
+#    status.json. Deleting while the instance runs lets the uploader put them back.
+```
+
+First run: 2026-10-24, label `test-mission-2026-10-24`, clearing the training
+mission's data before VIAF's first real session.
+
 ## Troubleshooting
 
 **A pilot's stats are missing and nothing errors.** Check whether their name
