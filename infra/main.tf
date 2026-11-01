@@ -223,7 +223,7 @@ resource "aws_iam_instance_profile" "instance" {
 # ---------------------------------------------------------------------------
 
 resource "aws_instance" "dcs" {
-  ami           = data.aws_ami.windows.id
+  ami           = var.ami_id != "" ? var.ami_id : data.aws_ami.windows.id
   instance_type = var.instance_type
   subnet_id     = data.aws_subnets.usable.ids[0]
   key_name      = var.key_pair_name

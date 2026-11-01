@@ -363,3 +363,29 @@ variable "nomad_router_model_arn" {
   type        = string
   default     = ""
 }
+
+variable "ami_id" {
+  description = <<-EOT
+    Build the instance from your own AMI (README "Bake an AMI") instead of a
+    fresh Windows image. Empty = latest Amazon Windows Server 2022. Only read
+    when the instance is created.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "aws_profile" {
+  description = "Named AWS CLI profile. Null = the default credential chain."
+  type        = string
+  default     = null
+}
+
+variable "allowed_account_ids" {
+  description = <<-EOT
+    Refuse to run against any other AWS account. Local state is per-folder and
+    credentials are per-machine, so pointing one at the wrong account plans to
+    rebuild everything there.
+  EOT
+  type        = list(string)
+  default     = null
+}

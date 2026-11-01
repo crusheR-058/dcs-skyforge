@@ -14,6 +14,9 @@ terraform {
 }
 
 provider "aws" {
+  profile             = var.aws_profile
+  allowed_account_ids = var.allowed_account_ids
+
   region = var.region
 
   default_tags {
@@ -34,6 +37,9 @@ provider "aws" {
 # Cross-region control is harmless -- the Lambda just points its EC2 and SSM
 # clients at var.region. Latency on a start/stop call is irrelevant.
 provider "aws" {
+  profile             = var.aws_profile
+  allowed_account_ids = var.allowed_account_ids
+
   alias  = "bot"
   region = var.bot_region
 
