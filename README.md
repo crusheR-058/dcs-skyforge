@@ -609,6 +609,45 @@ terraform destroy   # note: root volume has delete_on_termination = false
 
 ---
 
+### Moving to another AWS account
+
+The disk, the Elastic IP and the data can all move, so players keep the same
+address. In order:
+
+1. **Image.** Create an AMI from the stopped server. A disk encrypted with the
+   AWS-managed `aws/ebs` key cannot be shared, so `copy-image` it with a customer
+   managed KMS key that grants the new account use, share that copy with
+   `modify-image-attribute` and `modify-snapshot-attribute`, then `copy-image` it
+   again from the new account so nothing depends on the old key.
+2. **Data.** Create the new buckets, add a temporary bucket policy that lets the
+   old account write, `aws s3 sync` across, then remove the policy. Copy
+   `/dcs/discord-webhook` last (see step 5) and recreate the `nomad-dcs`
+   vocabulary. Bedrock custom models cannot be shared outside an AWS
+   Organization, so retrain the router; Nomad routes with the base model until
+   then.
+3. **Infrastructure.** Use a fresh state with `ami_id`, `aws_profile`,
+   `allowed_account_ids` and the new bucket names set, and `terraform import` the
+   board bucket if the data is already in it. Leave `enable_game_nights` and
+   `enable_auto_update` off until the switch.
+4. **Instance.** The real bucket names live only on the instance, because the
+   `$Bucket` and `$BoardUrl` defaults here are placeholders. Update
+   `campaign-backup.ps1`, `install-mod.ps1`, `skyforge-upload.ps1` and
+   `announce.ps1` in `C:\dcs-state`, and `router_model_id` in `C:\Nomad`.
+5. **Test** on the temporary IP. **Do not let the copy post to Discord:**
+   `announce.ps1` runs at every boot with a hard-coded address, so without the
+   webhook parameter it stays quiet. The first boot takes about 8 minutes while
+   the disk loads from the snapshot. A new account may also get `Your account is
+   currently being verified` from Bedrock in `ap-south-1` for up to 2 hours.
+6. **Switch.** Stop the old bot and schedules, then `disassociate-address`,
+   `enable-address-transfer` and, from the new account, `accept-address-transfer`.
+   In Terraform: `state rm` the old `aws_eip` and `aws_eip_association`, `import`
+   the transferred address, apply, and restart DCS so it registers on it. Restore
+   the webhook, re-enable the schedules, and set the new Interactions Endpoint
+   URL in the Discord Developer Portal. The board moves to a new CloudFront URL.
+
+Keep the old stopped server until the new one has been flown on. Deleting it
+ends any way back.
+
 ## Verifying the prices
 
 Nothing here is quoted from memory. Reproduce it:
